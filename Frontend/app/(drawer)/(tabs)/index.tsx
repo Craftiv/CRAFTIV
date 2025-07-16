@@ -102,7 +102,7 @@ export default function HomeScreen() {
   const flyerTemplates = transformTemplates(getTemplatesByCategory('Flyers'));
   const posterTemplates = transformTemplates(getTemplatesByCategory('Posters'));
   const cardTemplates = transformTemplates(getTemplatesByCategory('Cards & Invites'));
-  const bannerTemplates = transformTemplates(getTemplatesByCategory('Banners & Ads'));
+  const resumeTemplates = transformTemplates(getTemplatesByCategory('Resume'));
   const socialTemplates = transformTemplates(getTemplatesByCategory('Social Media'));
 
   if (loading) {
@@ -152,7 +152,7 @@ export default function HomeScreen() {
         <Section title="Flyers" data={flyerTemplates} />
         <Section title="Posters" data={posterTemplates} />
         <Section title="Cards & Invites" data={cardTemplates} />
-        <Section title="Banners & Ads" data={bannerTemplates} />
+        <Section title="Resume" data={resumeTemplates} />
         <Section 
           title="Social Media" 
           data={socialTemplates} 

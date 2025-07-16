@@ -84,7 +84,8 @@ export default function Card({ item, isAddButton = false }: CardProps) {
 
 const styles = StyleSheet.create({
   card: { 
-    width: 100, // Reduced from 120
+    width: 100, // keep width
+    height: 150, // match image height
     marginRight: 12, 
     backgroundColor: '#fff', 
     borderRadius: 12, 
@@ -95,10 +96,10 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 4,
   },
-  image: { width: '100%', height: 120 }, // Increased from 90
+  image: { width: '100%', height: 150 }, // increased from 120
   addButtonImage: { 
     width: '100%', 
-    height: 120, // Increased from 90
+    height: 150, // increased from 120
     backgroundColor: '#F8F8F8', 
     justifyContent: 'center', 
     alignItems: 'center',

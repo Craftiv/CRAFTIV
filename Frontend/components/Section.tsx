@@ -43,6 +43,7 @@ export default function Section({ title, data, showAddButton = false, onSeeAll }
         renderItem={renderItem}
         keyExtractor={item => item.id}
         showsHorizontalScrollIndicator={false}
+        contentContainerStyle={{ paddingLeft: 16 }}
       />
     </View>
   );

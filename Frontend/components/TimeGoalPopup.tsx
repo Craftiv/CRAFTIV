@@ -28,8 +28,11 @@ export default function TimeGoalPopup({ visible, onClose }: TimeGoalPopupProps) 
 
   const handleTimeSelect = (minutes: number) => {
     setSelectedTime(minutes);
-    setCustomMinutes('');
-    setCustomHours('');
+    // Calculate hours and minutes from total minutes
+    const hrs = Math.floor(minutes / 60);
+    const mins = minutes % 60;
+    setCustomHours(String(hrs));
+    setCustomMinutes(String(mins));
     Keyboard.dismiss();
   };
 

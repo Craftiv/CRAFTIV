@@ -140,7 +140,14 @@ export default function DocsEditor() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#fff', paddingTop: 32 },
-  topToolbar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 12, paddingBottom: 8 },
+  topToolbar: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    justifyContent: 'space-between', 
+    paddingHorizontal: 12, 
+    paddingBottom: 8, 
+    paddingTop: 28, // add space from the top
+  },
   saveTemplateBtn: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#6366F1', borderRadius: 16, paddingHorizontal: 10, paddingVertical: 4 },
   editorArea: { flex: 1, paddingHorizontal: 16 },
   textInput: { minHeight: 120, fontSize: 18, marginTop: 16 },
