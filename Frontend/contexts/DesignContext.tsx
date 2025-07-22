@@ -8,6 +8,8 @@ export interface DesignData {
   createdAt: Date;
   isCompleted: boolean;
   content?: string;
+  elements?: any[]; // Add this for full design preview
+  canvasBackgroundColor?: string; // Add this for full design preview
 }
 
 interface DesignContextType {

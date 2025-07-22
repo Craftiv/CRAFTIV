@@ -1,10 +1,10 @@
 import { FontAwesome5, Ionicons, MaterialIcons } from '@expo/vector-icons';
+import { Audio } from 'expo-av';
+import { BlurView } from 'expo-blur';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Animated, BackHandler, Dimensions, Easing, StyleSheet, Switch, Text, TouchableOpacity, View } from 'react-native';
+import { Alert, Animated, BackHandler, Dimensions, Easing, StyleSheet, Switch, Text, TouchableOpacity, View } from 'react-native';
 import { useTimerStore } from '../../stores/timerStore';
-// --- Notification ---
-import * as Notifications from 'expo-notifications';
 
 const { width: screenWidth } = Dimensions.get('window');
 
@@ -16,6 +16,32 @@ function formatTime(ms: number) {
   return [hours, minutes, seconds]
     .map(unit => unit.toString().padStart(2, '0'))
     .join(':');
+}
+
+async function playTimerSound() {
+  try {
+    const { sound } = await Audio.Sound.createAsync(
+      require('../../assets/sounds/timer-done.wav')
+    );
+    let playCount = 0;
+    sound.setOnPlaybackStatusUpdate(async status => {
+      if (status.isLoaded && status.didJustFinish) {
+        playCount++;
+        if (playCount < 2) {
+          await sound.replayAsync();
+        } else {
+          await sound.unloadAsync();
+        }
+      }
+    });
+    await sound.playAsync();
+  } catch (error) {
+    console.log('Error playing sound:', error);
+  }
+}
+
+function showTimerAlert() {
+  Alert.alert('Time is up!', 'Your timer session has ended.');
 }
 
 export default function TimerScreen() {
@@ -38,49 +64,80 @@ export default function TimerScreen() {
   // --- Notification permission state ---
   const [notificationPermission, setNotificationPermission] = useState(false);
   const notificationSentRef = useRef(false);
+  const [notificationSent, setNotificationSent] = useState(false);
 
   // Request notification permissions
   useEffect(() => {
     if (notify) {
-      Notifications.requestPermissionsAsync().then((status) => {
-        setNotificationPermission(status.granted);
-      });
+      // Notifications.requestPermissionsAsync().then((status) => {
+      //   setNotificationPermission(status.granted);
+      // });
     }
   }, [notify]);
 
   // Show notification helper
   const showNotification = async () => {
     try {
-      await Notifications.scheduleNotificationAsync({
-        content: {
-          title: 'Time is up!',
-          body: 'Your timer session has ended.',
-          sound: 'default', // This will play the system notification sound
-        },
-        trigger: null,
-      });
+      // await Notifications.scheduleNotificationAsync({
+      //   content: {
+      //     title: 'Time is up!',
+      //     body: 'Your timer session has ended.',
+      //     sound: 'default', // This will play the system notification sound
+      //   },
+      //   trigger: null,
+      // });
     } catch (e) {
       console.log('Error showing notification:', e);
     }
   };
 
   // Watch for timer reaching zero
+  const [showTopNotification, setShowTopNotification] = useState(false);
+  const notificationAnim = useRef(new Animated.Value(-100)).current;
+
+  // Show glassy notification when timer is up
   useEffect(() => {
     if (
       mode === 'countdown' &&
       remainingTime === 0 &&
       isRunning === false &&
       notify &&
-      !notificationSentRef.current
+      !notificationSent
     ) {
-      notificationSentRef.current = true;
-      showNotification();
+      playTimerSound();
+      showTimerAlert();
+      setNotificationSent(true);
+      setShowTopNotification(true);
+      Animated.timing(notificationAnim, {
+        toValue: 0,
+        duration: 500,
+        easing: Easing.out(Easing.exp),
+        useNativeDriver: true,
+      }).start();
     }
-    // Reset flag if timer is reset or restarted
-    if (remainingTime > 0) {
-      notificationSentRef.current = false;
+    if (remainingTime > 0 && notificationSent) {
+      setNotificationSent(false);
     }
-  }, [remainingTime, isRunning, notify, mode]);
+  }, [remainingTime, isRunning, mode, notify, notificationSent]);
+
+  const handleAddFiveMinutes = () => {
+    setCountdownDuration(5 * 60 * 1000 + remainingTime);
+    setShowTopNotification(false);
+    Animated.timing(notificationAnim, {
+      toValue: -100,
+      duration: 400,
+      useNativeDriver: true,
+    }).start();
+  };
+
+  const handleDismissNotification = () => {
+    setShowTopNotification(false);
+    Animated.timing(notificationAnim, {
+      toValue: -100,
+      duration: 400,
+      useNativeDriver: true,
+    }).start();
+  };
 
   // Calculate hours and minutes from countdown duration for display
   const totalMinutes = Math.floor(countdownDuration / (60 * 1000));
@@ -165,6 +222,70 @@ export default function TimerScreen() {
 
   return (
     <View style={styles.plainBg}>
+      {showTopNotification && (
+        <Animated.View style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          zIndex: 100,
+          transform: [{ translateY: notificationAnim }],
+          alignItems: 'center',
+        }}>
+          <BlurView intensity={90} tint="light" style={{
+            marginTop: 40,
+            marginHorizontal: 16,
+            borderRadius: 20,
+            padding: 20,
+            width: '90%',
+            alignItems: 'center',
+            shadowColor: '#A78BFA',
+            shadowOffset: { width: 0, height: 8 },
+            shadowOpacity: 0.18,
+            shadowRadius: 24,
+            elevation: 10,
+            borderWidth: 1.5,
+            borderColor: 'rgba(163,139,255,0.25)',
+            backgroundColor: 'rgba(255,255,255,0.25)',
+          }}>
+            <Text style={{ fontSize: 22, fontWeight: 'bold', color: '#6366F1', marginBottom: 6 }}>⏰ Time’s Up!</Text>
+            <Text style={{ fontSize: 16, color: '#23235B', marginBottom: 16, textAlign: 'center' }}>
+              Your timer session has ended. Would you like to add more time?
+            </Text>
+            <View style={{ flexDirection: 'row', gap: 16 }}>
+              <TouchableOpacity
+                style={{
+                  backgroundColor: '#6366F1',
+                  paddingVertical: 8,
+                  paddingHorizontal: 20,
+                  borderRadius: 12,
+                  marginRight: 8,
+                  shadowColor: '#A78BFA',
+                  shadowOpacity: 0.18,
+                  shadowRadius: 8,
+                  elevation: 2,
+                }}
+                onPress={handleAddFiveMinutes}
+              >
+                <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 16 }}>+5 min</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={{
+                  backgroundColor: 'rgba(99,102,241,0.08)',
+                  paddingVertical: 8,
+                  paddingHorizontal: 20,
+                  borderRadius: 12,
+                  borderWidth: 1,
+                  borderColor: '#6366F1',
+                }}
+                onPress={handleDismissNotification}
+              >
+                <Text style={{ color: '#6366F1', fontWeight: 'bold', fontSize: 16 }}>Dismiss</Text>
+              </TouchableOpacity>
+            </View>
+          </BlurView>
+        </Animated.View>
+      )}
       {/* Top Bar with Back Icon */}
       <View style={styles.topBar}>
         <TouchableOpacity 

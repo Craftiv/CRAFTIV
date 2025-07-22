@@ -33,10 +33,29 @@ export const useTimerStore = create<TimerState>((set, get) => ({
   start: () => {
     if (!get().isRunning) {
       const now = Date.now();
-      set(state => ({
-        isRunning: true,
-        startTime: now - (state.mode === 'stopwatch' ? state.elapsedTime : (state.countdownDuration - state.remainingTime)),
-      }));
+      const state = get();
+      console.log('Timer starting with:', {
+        mode: state.mode,
+        countdownDuration: state.countdownDuration,
+        remainingTime: state.remainingTime
+      });
+      
+      set(state => {
+        if (state.mode === 'stopwatch') {
+          return {
+            isRunning: true,
+            startTime: now - state.elapsedTime,
+          };
+        } else {
+          // countdown: always start from countdownDuration
+          console.log('Starting countdown from:', state.countdownDuration, 'ms');
+          return {
+            isRunning: true,
+            startTime: now,
+            remainingTime: state.countdownDuration,
+          };
+        }
+      });
     }
   },
   pause: () => {
@@ -64,7 +83,13 @@ export const useTimerStore = create<TimerState>((set, get) => ({
     elapsedTime: 0,
     remainingTime: state.countdownDuration,
   })),
-  setCountdownDuration: (ms) => set({ countdownDuration: ms, remainingTime: ms }),
+  setCountdownDuration: (ms) => {
+    console.log('Setting countdown duration to:', ms, 'ms');
+    set(state => ({
+      countdownDuration: ms,
+      remainingTime: ms, // Always set remaining time to the new duration
+    }));
+  },
   tick: () => {
     const now = Date.now();
     const { isRunning, startTime, mode, countdownDuration } = get();

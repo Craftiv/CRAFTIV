@@ -18,8 +18,25 @@ export function parseFigmaFrameToElements(frameNode: any): Element[] {
   const originY = frameNode.absoluteBoundingBox?.y || 0;
 
   function walk(node: any) {
-    // Rectangle
-    if (node.type === 'RECTANGLE') {
+    // If node has fills and any fill is an IMAGE, treat as image element
+    if (node.fills && Array.isArray(node.fills)) {
+      const imageFill = node.fills.find((fill: any) => fill.type === 'IMAGE');
+      if (imageFill) {
+        elements.push({
+          id: node.id,
+          type: 'image',
+          x: (node.absoluteBoundingBox?.x || 0) - originX,
+          y: (node.absoluteBoundingBox?.y || 0) - originY,
+          width: node.absoluteBoundingBox?.width || 100,
+          height: node.absoluteBoundingBox?.height || 100,
+          uri: '', // Placeholder, should be filled by image API fetch
+          selected: false,
+        } as Element);
+        // Do not return; a node with an image fill may also have children with images
+      }
+    }
+    // Rectangle (with color fill)
+    if (node.type === 'RECTANGLE' && (!node.fills || !node.fills.some((fill: any) => fill.type === 'IMAGE'))) {
       elements.push({
         id: node.id,
         type: 'rectangle',
@@ -29,7 +46,7 @@ export function parseFigmaFrameToElements(frameNode: any): Element[] {
         height: node.absoluteBoundingBox?.height || 100,
         backgroundColor: figmaColorToHex(node.fills?.[0]?.color),
         selected: false,
-      });
+      } as Element);
     }
     // Ellipse
     if (node.type === 'ELLIPSE') {
@@ -42,7 +59,7 @@ export function parseFigmaFrameToElements(frameNode: any): Element[] {
         height: node.absoluteBoundingBox?.height || 100,
         backgroundColor: figmaColorToHex(node.fills?.[0]?.color),
         selected: false,
-      });
+      } as Element);
     }
     // Line
     if (node.type === 'LINE') {
@@ -55,7 +72,7 @@ export function parseFigmaFrameToElements(frameNode: any): Element[] {
         height: node.absoluteBoundingBox?.height || 2,
         backgroundColor: figmaColorToHex(node.strokes?.[0]?.color),
         selected: false,
-      });
+      } as Element);
     }
     // Text
     if (node.type === 'TEXT') {
@@ -71,29 +88,17 @@ export function parseFigmaFrameToElements(frameNode: any): Element[] {
         fontFamily: node.style?.fontFamily || 'System',
         color: figmaColorToHex(node.fills?.[0]?.color),
         selected: false,
-      });
+      } as Element);
     }
-    // Image (rectangle with image fill)
-    if (
-      node.type === 'RECTANGLE' &&
-      node.fills &&
-      node.fills[0]?.type === 'IMAGE'
-    ) {
-      elements.push({
-        id: node.id,
-        type: 'image',
-        x: (node.absoluteBoundingBox?.x || 0) - originX,
-        y: (node.absoluteBoundingBox?.y || 0) - originY,
-        width: node.absoluteBoundingBox?.width || 100,
-        height: node.absoluteBoundingBox?.height || 100,
-        uri: '', // Placeholder, should be filled by image API fetch
-        selected: false,
-      });
+    // Recursively walk all children for frames/groups/components/instances
+    if ((['FRAME', 'GROUP', 'COMPONENT', 'INSTANCE'].includes(node.type)) && node.children) {
+      if (Array.isArray(node.children)) {
+        node.children.forEach(walk);
+      }
+      return;
     }
-    // Robustly walk all children for frames/groups/other containers
-    if ((node.type === 'FRAME' || node.type === 'GROUP') && node.children) {
-      node.children.forEach(walk);
-    } else if (node.children) {
+    // Fallback: walk children if present
+    if (node.children && Array.isArray(node.children)) {
       node.children.forEach(walk);
     }
   }

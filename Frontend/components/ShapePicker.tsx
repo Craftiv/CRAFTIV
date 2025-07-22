@@ -1,5 +1,5 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { StyleSheet, TouchableOpacity, View } from 'react-native';
+import { ScrollView, StyleSheet, TouchableOpacity } from 'react-native';
 
 const shapes = [
   { type: 'rectangle', icon: <MaterialCommunityIcons name="rectangle-outline" size={28} color="#6366F1" /> },
@@ -19,7 +19,7 @@ const shapes = [
 
 export default function ShapePicker({ selected, onSelect }: { selected: string; onSelect: (type: string) => void }) {
   return (
-    <View style={styles.row}>
+    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.row} style={styles.scroll}>
       {shapes.map((shape) => (
         <TouchableOpacity
           key={shape.type}
@@ -29,12 +29,25 @@ export default function ShapePicker({ selected, onSelect }: { selected: string; 
           {shape.icon}
         </TouchableOpacity>
       ))}
-    </View>
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  row: { flexDirection: 'row', padding: 8, backgroundColor: '#F3F4F6', borderRadius: 16, marginVertical: 8, alignSelf: 'center' },
+  scroll: {
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+    shadowColor: '#000',
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 4,
+    marginVertical: 8,
+    alignSelf: 'center',
+    maxWidth: 340,
+  },
+  row: { flexDirection: 'row', padding: 8, alignItems: 'center' },
   btn: { marginHorizontal: 6, padding: 6, borderRadius: 8 },
   selected: { backgroundColor: '#6366F1', },
 }); 

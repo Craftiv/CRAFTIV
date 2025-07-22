@@ -1,5 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { ScrollView, StatusBar, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
@@ -39,7 +40,7 @@ interface DocTemplate {
 export default function HomeScreen() {
   const { colors, isDark } = useTheme();
   const { recentDesigns } = useDesigns();
-  const { templates, loading, error, getTemplatesByCategory } = useTemplates();
+  const { templates, getTemplatesByCategory } = useTemplates();
   const router = useRouter();
   const [docsTemplates, setDocsTemplates] = useState<DocTemplate[]>([]);
   const [showTimeGoalPopup, setShowTimeGoalPopup] = useState(false);
@@ -105,22 +106,6 @@ export default function HomeScreen() {
   const resumeTemplates = transformTemplates(getTemplatesByCategory('Resume'));
   const socialTemplates = transformTemplates(getTemplatesByCategory('Social Media'));
 
-  if (loading) {
-    return (
-      <View style={{ flex: 1, backgroundColor: colors.background, justifyContent: 'center', alignItems: 'center' }}>
-        <Text style={{ color: colors.text }}>Loading templates...</Text>
-      </View>
-    );
-  }
-
-  if (error) {
-    return (
-      <View style={{ flex: 1, backgroundColor: colors.background, justifyContent: 'center', alignItems: 'center' }}>
-        <Text style={{ color: colors.text }}>Error loading templates: {error}</Text>
-      </View>
-    );
-  }
-
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
       
@@ -130,22 +115,30 @@ export default function HomeScreen() {
         <CategoryTabs />
         
         {/* AI Design Generator Button */}
-        <TouchableOpacity 
-          style={styles.aiButton}
-          onPress={() => router.push('/(drawer)/AIDesignScreen')}
-          activeOpacity={0.8}
+        <LinearGradient
+          colors={['#A78BFA', '#6366F1', '#60A5FA']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.aiButtonGradient}
         >
-          <View style={styles.aiButtonContent}>
-            <View style={styles.aiIconContainer}>
-              <Ionicons name="sparkles" size={24} color="#fff" />
+          <TouchableOpacity
+            style={styles.aiButtonNew}
+            onPress={() => router.push('/(drawer)/AIDesignScreen')}
+            activeOpacity={0.85}
+          >
+            <View style={styles.aiGlowIconWrap}>
+              <View style={styles.aiGlow} />
+              <Ionicons name="sparkles" size={36} color="#fff" style={{ zIndex: 2 }} />
             </View>
-            <View style={styles.aiTextContainer}>
-              <Text style={styles.aiButtonTitle}>✨ Start with AI</Text>
-              <Text style={styles.aiButtonSubtitle}>Generate designs with AI assistance</Text>
+            <View style={styles.aiTextContainerNew}>
+              <Text style={styles.aiButtonTitleNew}>✨ AI Design Magic</Text>
+              <Text style={styles.aiButtonSubtitleNew}>Let AI spark your next creative masterpiece!</Text>
             </View>
-            <Ionicons name="arrow-forward" size={20} color="#fff" />
-          </View>
-        </TouchableOpacity>
+            <View style={styles.aiArrowWrap}>
+              <Ionicons name="arrow-forward-circle" size={32} color="#fff" />
+            </View>
+          </TouchableOpacity>
+        </LinearGradient>
         
         {/* <QuickActions /> */}
         <Section title="Recent Designs" data={recentDesigns} showAddButton={true} />
@@ -251,5 +244,64 @@ const styles = StyleSheet.create({
   aiButtonSubtitle: {
     color: 'rgba(255, 255, 255, 0.8)',
     fontSize: 14,
+  },
+  aiButtonGradient: {
+    marginHorizontal: 20,
+    marginVertical: 16,
+    borderRadius: 24,
+    shadowColor: '#A78BFA',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.18,
+    shadowRadius: 24,
+    elevation: 10,
+  },
+  aiButtonNew: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 20,
+    borderRadius: 24,
+    backgroundColor: 'rgba(255,255,255,0.10)',
+    overflow: 'hidden',
+  },
+  aiGlowIconWrap: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 16,
+    position: 'relative',
+  },
+  aiGlow: {
+    position: 'absolute',
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: 'rgba(255,255,255,0.25)',
+    shadowColor: '#fff',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.7,
+    shadowRadius: 16,
+    zIndex: 1,
+  },
+  aiTextContainerNew: {
+    flex: 1,
+  },
+  aiButtonTitleNew: {
+    color: '#fff',
+    fontSize: 20,
+    fontWeight: 'bold',
+    marginBottom: 2,
+    letterSpacing: 0.5,
+  },
+  aiButtonSubtitleNew: {
+    color: 'rgba(255,255,255,0.92)',
+    fontSize: 15,
+    fontWeight: '500',
+  },
+  aiArrowWrap: {
+    marginLeft: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 });

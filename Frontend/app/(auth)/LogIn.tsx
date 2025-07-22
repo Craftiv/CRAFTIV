@@ -3,21 +3,22 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
 import {
-    ActivityIndicator,
-    Alert,
-    BackHandler,
-    Image,
-    Keyboard,
-    KeyboardAvoidingView,
-    Platform,
-    SafeAreaView,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    TouchableWithoutFeedback,
-    View,
+  ActivityIndicator,
+  Alert,
+  BackHandler,
+  Image,
+  Keyboard,
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  TouchableWithoutFeedback,
+  View,
 } from 'react-native';
 import { useAuth } from '../../contexts/AuthContext';
 
@@ -54,14 +55,7 @@ export default function LoginScreen() {
       return;
     }
 
-    const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[\W_]).{8,}$/;
-    if (!passwordRegex.test(password)) {
-      Alert.alert(
-        'Weak Password',
-        'Password must be 8+ characters and include a capital letter, number, and special character'
-      );
-      return;
-    }
+    
 
     setLoading(true);
 
@@ -111,6 +105,13 @@ export default function LoginScreen() {
       style={styles.keyboardAvoidingView}
     >
       <SafeAreaView style={styles.safeArea}>
+        <Pressable
+          onPress={() => router.back()}
+          hitSlop={10}
+          style={{ position: 'absolute', top: 40, left: 10, zIndex: 10 }}
+        >
+          <Ionicons name="chevron-back" size={28} color="#333" />
+        </Pressable>
         <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
           <ScrollView 
             contentContainerStyle={styles.scrollView}

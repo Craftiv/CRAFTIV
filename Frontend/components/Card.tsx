@@ -1,6 +1,8 @@
 import { Ionicons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
 import { Alert, Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useDesigns } from '../contexts/DesignContext';
 import { useDesignStore } from '../stores/designStore';
 
 interface CardProps {
@@ -11,24 +13,40 @@ interface CardProps {
 export default function Card({ item, isAddButton = false }: CardProps) {
   const router = useRouter();
   const { clearDesign, loadDesignById } = useDesignStore();
+  const { getDesignById } = useDesigns();
 
   const handleAddDesign = () => {
     // Clear any existing design to start fresh
     clearDesign();
-    router.push('CanvaDesignPage' as any);
+    
+    // Clear any cached data from AsyncStorage
+    AsyncStorage.removeItem('design_data').catch(console.error);
+    
+    // Always open a new CanvaDesignPage instance with unique parameter
+    const unique = Date.now();
+    router.push({ pathname: '/CanvaDesignPage', params: { new: unique.toString() } } as any);
   };
 
   const handleEditDesign = async () => {
     try {
+      // Get the design from DesignContext
+      const design = getDesignById(item.id);
       
-      // Load the specific design into the store
-      const success = await loadDesignById(item.id);
-      
-      if (success) {
-        // Navigate to the design page for editing
-        router.push('/CanvaDesignPage' as any);
+      if (design && design.elements) {
+        // Clear any existing design
+        clearDesign();
+        
+        // Navigate to CanvaDesignPage with design data
+        router.push({
+          pathname: '/CanvaDesignPage' as any,
+          params: { 
+            edit: item.id,
+            designData: JSON.stringify(design.elements),
+            canvasBgColor: design.canvasBackgroundColor || '#fff'
+          }
+        });
       } else {
-        console.error('Failed to load design - design not found in storage');
+        console.error('Failed to load design - design not found in context');
         Alert.alert('Error', 'Failed to load design - design not found');
       }
     } catch (error) {
@@ -77,7 +95,12 @@ export default function Card({ item, isAddButton = false }: CardProps) {
           <Text style={{ fontSize: 12, color: '#999' }}>No Image</Text>
         </View>
       )}
-      {/* Removed the label text to hide small titles under templates */}
+      {/* Show label for recent designs, hide for templates */}
+      {!isTemplate && item.label && (
+        <Text style={styles.label} numberOfLines={1}>
+          {item.label}
+        </Text>
+      )}
     </TouchableOpacity>
   );
 }

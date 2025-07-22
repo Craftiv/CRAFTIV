@@ -5,6 +5,7 @@ import { router } from 'expo-router';
 import { useState } from 'react';
 import { Alert, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { useTheme } from '../contexts/ThemeContext';
+import { useTimerStore } from '../stores/timerStore';
 import TimeGoalPopup from './TimeGoalPopup';
 
 export default function Header() {
@@ -13,6 +14,7 @@ export default function Header() {
   const [isSearching, setIsSearching] = useState(false);
   const [showTimeGoalPopup, setShowTimeGoalPopup] = useState(false);
   const navigation = useNavigation();
+  const { countdownDuration } = useTimerStore();
 
   const handleSearch = async () => {
     if (!searchText.trim()) {
@@ -40,7 +42,11 @@ export default function Header() {
   };
 
   const handleTimerPress = () => {
-    setShowTimeGoalPopup(true);
+    if (countdownDuration > 0) {
+      router.push('/(drawer)/TimerScreen');
+    } else {
+      setShowTimeGoalPopup(true);
+    }
   };
 
   const handleTimeGoalClose = () => {
@@ -73,16 +79,16 @@ export default function Header() {
       <Text style={[styles.title, { color: isDark ? '#fff' : colors.text, backgroundColor: 'transparent' }]}>What will you design today?</Text>
       <View style={styles.searchRow}>
         <TouchableOpacity style={[styles.tabBtn, { backgroundColor: 'transparent', borderWidth: 0 }]} onPress={() => router.push('/YourStories')}>
-          <Ionicons name="color-palette" size={18} color="black" />
-          <Text>Your Designs</Text>
+          <Ionicons name="color-palette" size={18} color={isDark ? '#fff' : 'black'} />
+          <Text style={{ color: isDark ? '#fff' : '#23235B' }}>Your Designs</Text>
         </TouchableOpacity>
         <TouchableOpacity style={[styles.tabBtn, { backgroundColor: 'transparent', borderWidth: 0 }]} onPress={handleTimerPress}>
-          <Ionicons name="time-outline" size={18} color="black" />
-          <Text>Timer</Text>
+          <Ionicons name="time-outline" size={18} color={isDark ? '#fff' : 'black'} />
+          <Text style={{ color: isDark ? '#fff' : '#23235B' }}>Timer</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={[styles.tabBtn, { backgroundColor: 'transparent', borderWidth: 0 }]}> 
-          <Ionicons name="grid" size={18} color="black" />
-          <Text>Templates</Text>
+        <TouchableOpacity style={[styles.tabBtn, { backgroundColor: 'transparent', borderWidth: 0 }]} onPress={() => router.push('/(drawer)/(tabs)/explore')}>
+          <Ionicons name="grid" size={18} color={isDark ? '#fff' : 'black'} />
+          <Text style={{ color: isDark ? '#fff' : '#23235B' }}>Templates</Text>
         </TouchableOpacity>
       </View>
       <View style={[styles.glowSearchContainer, { backgroundColor: isDark ? '#23243a' : '#F3F4F6' }]}> 

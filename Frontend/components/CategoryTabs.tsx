@@ -14,8 +14,8 @@ type Category = {
 
 const categories: Category[] = [
   { icon: 'image', label: 'Your story', bgColor: '#FF10F440', iconColor: '#FF10F4', route: '/YourStories' }, 
-  { icon: 'play-box', label: 'Mobile Video', bgColor: '#FF10F4', iconColor: '#FFFFFF' },
-  { icon: 'tshirt-crew', label: 'T-Shirt', bgColor: '#C22EF340', iconColor: '#5927EC' },
+  { icon: 'play-box', label: 'Mobile Video', bgColor: '#FF10F4', iconColor: '#FFFFFF', route: '/(drawer)/MobileVideoScreen' },
+  { icon: 'tshirt-crew', label: 'T-Shirt', bgColor: '#00BCD440', iconColor: '#00BCD4', route: '/(drawer)/TShirtDesignScreen' },
   { icon: 'account-group', label: 'Social Media', bgColor: '#EF191C', iconColor: '#FFFFFF' },
   { icon: 'camera', label: 'Photo Editor', bgColor: '#FF2290', iconColor: '#FFFFFF' },
 //   { icon: 'dots-horizontal-circle-outline', label: 'More', bgColor:'#F3EEF3', iconColor:'#000000' },
@@ -23,7 +23,7 @@ const categories: Category[] = [
 
 const extraCategories: Category[] = [
     { icon: 'file-table', label: 'Sheets', bgColor: '#4285F440', iconColor: '#4285F4' },
-    { icon: 'presentation', label: 'Presentation', bgColor: '#34A85340', iconColor: '#34A853' },
+    { icon: 'presentation', label: 'Presentation', bgColor: '#34A85340', iconColor: '#34A853', route: '/(drawer)/PresentationsScreen' },
     { icon: 'file-document-edit', label: 'Doc', bgColor: '#FBBC0540', iconColor: '#FBBC05', route: '/(drawer)/DocsEditor' },
     { icon: 'web', label: 'Website', bgColor: '#EA433540', iconColor: '#EA4335' },
   ];

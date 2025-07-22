@@ -1,96 +1,169 @@
 import { Ionicons } from '@expo/vector-icons';
 import { DrawerContentScrollView } from '@react-navigation/drawer';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
 
 export default function CustomDrawerContent(props: any) {
   const router = useRouter();
-  const { isDark, colors } = useTheme();
+  const { isDark } = useTheme();
+  const { profileImage } = useAuth();
 
-  // Define gradients and text/icon colors for each mode
-  const gradientColors = isDark
-    ? (['rgba(24,25,27,0.95)', 'rgba(99,102,241,0.25)', 'rgba(24,25,27,0.85)'] as [string, string, ...string[]])
-    : (['rgba(99,102,241,0.50)', 'rgba(215, 161, 161, 0.15)', 'rgba(59,44,51,0.1)'] as [string, string, ...string[]]);
-  const fontColor = isDark ? '#F1F5F9' : '#1E293B';
-  const iconColor = isDark ? '#F1F5F9' : '#6366F1';
-  const dividerColor = isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(99,102,241,0.10)';
+  // User data (same as Profile.tsx)
+  const userName = 'Mina Torgah';
+  const userUsername = 'mina_torgah';
+
+  // Simple color scheme for both modes
+  const backgroundColor = isDark ? '#1a1a1a' : '#ffffff';
+  const textColor = isDark ? '#ffffff' : '#000000';
+  const iconColor = isDark ? '#6366F1' : '#6366F1';
+  const dividerColor = isDark ? '#333333' : '#e0e0e0';
+  const itemBackgroundColor = isDark ? '#2a2a2a' : '#f8f9fa';
+  const headerBackgroundColor = isDark ? '#6366F1' : '#6366F1';
 
   return (
-    <LinearGradient
-      colors={gradientColors}
-      start={{ x: 0, y: 0 }}
-      end={{ x: 1, y: 1 }}
-      style={styles.gradientBg}
-    >
-      <View style={styles.roundedWrapper}>
-      <DrawerContentScrollView {...props} contentContainerStyle={[styles.container, { backgroundColor: 'transparent' }]}>
-        <View style={styles.bigSpacer} />
-        <Text style={[styles.title, { color: fontColor }]}>Menu</Text>
-        <View style={[styles.divider, { backgroundColor: dividerColor }]} />
-        <TouchableOpacity style={styles.item} onPress={() => router.push('/(drawer)/(tabs)')}>
-          <Text style={[styles.label, { color: fontColor }]}>Home</Text>
+    <View style={[styles.container, { backgroundColor }]}>
+      <DrawerContentScrollView {...props} contentContainerStyle={styles.scrollContainer}>
+        {/* User Profile Header */}
+        <TouchableOpacity style={styles.header} onPress={() => router.push('/(drawer)/Profile')}>
+          <View style={styles.profileSection}>
+            <View style={styles.avatarContainer}>
+              {profileImage ? (
+                <Image source={{ uri: profileImage }} style={styles.avatar} />
+              ) : (
+                <View style={styles.avatarPlaceholder}>
+                  <Ionicons name="person" size={32} color={iconColor} />
+                </View>
+              )}
+            </View>
+            <View style={styles.userInfo}>
+              <Text style={[styles.userName, { color: textColor }]}>{userName}</Text>
+              <Text style={[styles.userUsername, { color: textColor, opacity: 0.7 }]}>@{userUsername}</Text>
+            </View>
+          </View>
         </TouchableOpacity>
-        <View style={[styles.divider, { backgroundColor: dividerColor }]} />
-        <TouchableOpacity style={styles.item} onPress={() => router.push('/(drawer)/(tabs)/projects')}>
-          <Ionicons name="folder" size={22} style={[styles.icon, { color: iconColor }]} />
-          <Text style={[styles.label, { color: fontColor }]}>Projects</Text>
+
+        {/* Menu Items */}
+        <View style={styles.menuContainer}>
+          <TouchableOpacity 
+            style={[styles.menuItem, { backgroundColor: itemBackgroundColor }]} 
+            onPress={() => router.push('/(drawer)/(tabs)')}
+          >
+            <Ionicons name="home" size={20} color={iconColor} />
+            <Text style={[styles.menuText, { color: textColor }]}>Home</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity 
+            style={[styles.menuItem, { backgroundColor: itemBackgroundColor }]} 
+            onPress={() => router.push('/(drawer)/(tabs)/projects')}
+          >
+            <Ionicons name="folder" size={20} color={iconColor} />
+            <Text style={[styles.menuText, { color: textColor }]}>Projects</Text>
         </TouchableOpacity>
-        <View style={[styles.divider, { backgroundColor: dividerColor }]} />
-        <TouchableOpacity style={styles.item} onPress={() => router.push('/(drawer)/AIDesignScreen')}>
-          <Ionicons name="sparkles" size={22} style={[styles.icon, { color: iconColor }]} />
-          <Text style={[styles.label, { color: fontColor }]}>AI Design Assistant</Text>
+
+          <TouchableOpacity 
+            style={[styles.menuItem, { backgroundColor: itemBackgroundColor }]} 
+            onPress={() => router.push('/(drawer)/AIDesignScreen')}
+          >
+            <Ionicons name="sparkles" size={20} color={iconColor} />
+            <Text style={[styles.menuText, { color: textColor }]}>AI Design Assistant</Text>
         </TouchableOpacity>
-        <View style={[styles.divider, { backgroundColor: dividerColor }]} />
-        <TouchableOpacity style={styles.item}>
-          <Ionicons name="albums" size={22} style={[styles.icon, { color: iconColor }]} />
-          <Text style={[styles.label, { color: fontColor }]}>Templates</Text>
+
+          <TouchableOpacity 
+            style={[styles.menuItem, { backgroundColor: itemBackgroundColor }]}
+          >
+            <Ionicons name="albums" size={20} color={iconColor} />
+            <Text style={[styles.menuText, { color: textColor }]}>Templates</Text>
         </TouchableOpacity>
+
         <View style={[styles.divider, { backgroundColor: dividerColor }]} />
-        <TouchableOpacity style={styles.item} onPress={() => router.push('/(drawer)/(tabs)/settings')}>
-          <Ionicons name="settings" size={22} style={[styles.icon, { color: iconColor }]} />
-          <Text style={[styles.label, { color: fontColor }]}>Settings</Text>
+
+          <TouchableOpacity 
+            style={[styles.menuItem, { backgroundColor: itemBackgroundColor }]} 
+            onPress={() => router.push('/(drawer)/(tabs)/settings')}
+          >
+            <Ionicons name="settings" size={20} color={iconColor} />
+            <Text style={[styles.menuText, { color: textColor }]}>Settings</Text>
         </TouchableOpacity>
-        <View style={[styles.divider, { backgroundColor: dividerColor }]} />
-        <TouchableOpacity style={styles.item} onPress={() => router.push('/(drawer)/Trash')}>
-          <Ionicons name="trash" size={22} style={[styles.icon, { color: iconColor }]} />
-          <Text style={[styles.label, { color: fontColor }]}>Trash</Text>
+
+          <TouchableOpacity 
+            style={[styles.menuItem, { backgroundColor: itemBackgroundColor }]} 
+            onPress={() => router.push('/(drawer)/Trash')}
+          >
+            <Ionicons name="trash" size={20} color={iconColor} />
+            <Text style={[styles.menuText, { color: textColor }]}>Trash</Text>
         </TouchableOpacity>
+        </View>
       </DrawerContentScrollView>
       </View>
-    </LinearGradient>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: 'transparent' },
-  bigSpacer: { height: 80 },
-  title: { fontWeight: 'bold', fontSize: 22, marginLeft: 16, marginBottom: 8, textShadowColor: 'rgba(0,0,0,0.2)', textShadowOffset: {width: 1, height: 1}, textShadowRadius: 4 },
-  divider: { height: 1, marginVertical: 2 },
-  item: { paddingVertical: 16, paddingHorizontal: 16 },
-  label: { fontSize: 16, textShadowColor: 'rgba(0,0,0,0.15)', textShadowOffset: {width: 1, height: 1}, textShadowRadius: 2 },
-  icon: {
-    marginRight: 16,
-    textShadowColor: 'rgba(99,102,241,0.4)',
-    textShadowOffset: {width: 1, height: 1},
-    textShadowRadius: 2,
-  },
-  gradientBg: {
+  container: {
     flex: 1,
+  },
+  scrollContainer: {
+    flexGrow: 1,
+  },
+  header: {
+    paddingTop: 60,
+    paddingBottom: 20,
+    paddingHorizontal: 20,
+  },
+  profileSection: {
+    flexDirection: 'column',
+    alignItems: 'center',
+  },
+  avatarContainer: {
+    marginBottom: 12,
+  },
+  avatar: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+  },
+  avatarPlaceholder: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    alignItems: 'center',
     justifyContent: 'center',
-    alignItems: 'stretch',
   },
-  roundedWrapper: {
+  userInfo: {
     flex: 1,
-    margin: 8,
-    borderRadius: 32,
-    overflow: 'hidden',
-    backgroundColor: 'rgba(255,255,255,0.15)',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.12,
-    shadowRadius: 24,
-    elevation: 8,
+  },
+  userName: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 2,
+  },
+  userUsername: {
+    fontSize: 14,
+    opacity: 0.7,
+  },
+  menuContainer: {
+    paddingHorizontal: 16,
+    paddingTop: 20,
+  },
+  menuItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 16,
+    paddingHorizontal: 16,
+    marginBottom: 8,
+    borderRadius: 12,
+  },
+  menuText: {
+    fontSize: 16,
+    fontWeight: '500',
+    marginLeft: 16,
+  },
+  divider: {
+    height: 1,
+    marginVertical: 16,
+    marginHorizontal: 8,
   },
 }); 

@@ -1,1504 +1,2140 @@
 import { Ionicons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import Slider from '@react-native-community/slider';
 import * as ImagePicker from 'expo-image-picker';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import React, { useEffect, useRef, useState } from 'react';
-import {
-    Alert,
-    Dimensions,
-    Modal,
-    PanResponder,
-    Platform,
-    SafeAreaView as RNSafeAreaView,
-    ScrollView,
-    StatusBar,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View
-} from 'react-native';
-import { SafeAreaView as SafeAreaContextView } from 'react-native-safe-area-context';
-
-// Conditionally import web-incompatible packages
-let Svg: any, Circle: any, Ellipse: any, Line: any, Polygon: any, Rect: any, SvgImage: any, SvgText: any;
-let ViewShot: any;
-
-if (Platform.OS !== 'web') {
-  try {
-    const svgModule = require('react-native-svg');
-    Svg = svgModule.default;
-    Circle = svgModule.Circle;
-    Ellipse = svgModule.Ellipse;
-    Line = svgModule.Line;
-    Polygon = svgModule.Polygon;
-    Rect = svgModule.Rect;
-    SvgImage = svgModule.Image;
-    SvgText = svgModule.Text;
-  } catch (error) {
-    console.warn('react-native-svg not available:', error);
-  }
-  
-  try {
-    ViewShot = require('react-native-view-shot').default;
-  } catch (error) {
-    console.warn('react-native-view-shot not available:', error);
-  }
-} else {
-  // Web fallback for ViewShot
-  ViewShot = React.forwardRef(({ children, style, ...props }: any, ref: any) => (
-    <View ref={ref} style={style} {...props}>
-      {children}
-    </View>
-  ));
-  // Web fallback components that convert SVG props to React Native props
-  Svg = ({ children, width, height, ...props }: any) => (
-    <View style={{ width, height, position: 'relative' }} {...props}>
-      {children}
-    </View>
-  );
-  
-  Rect = ({ x, y, width, height, fill, stroke, strokeWidth, onPress, ...props }: any) => (
-    <View
-      style={{
-        position: 'absolute',
-        left: x,
-        top: y,
-        width,
-        height,
-        backgroundColor: fill,
-        borderWidth: strokeWidth || 0,
-        borderColor: stroke || 'transparent',
-      }}
-      onTouchEnd={onPress}
-      {...props}
-    />
-  );
-  
-  Circle = ({ cx, cy, r, fill, stroke, strokeWidth, onPress, ...props }: any) => (
-    <View
-      style={{
-        position: 'absolute',
-        left: cx - r,
-        top: cy - r,
-        width: r * 2,
-        height: r * 2,
-        borderRadius: r,
-        backgroundColor: fill,
-        borderWidth: strokeWidth || 0,
-        borderColor: stroke || 'transparent',
-      }}
-      onTouchEnd={onPress}
-      {...props}
-    />
-  );
-  
-  Ellipse = ({ cx, cy, rx, ry, fill, stroke, strokeWidth, onPress, ...props }: any) => (
-    <View
-      style={{
-        position: 'absolute',
-        left: cx - rx,
-        top: cy - ry,
-        width: rx * 2,
-        height: ry * 2,
-        borderRadius: Math.min(rx, ry),
-        backgroundColor: fill,
-        borderWidth: strokeWidth || 0,
-        borderColor: stroke || 'transparent',
-      }}
-      onTouchEnd={onPress}
-      {...props}
-    />
-  );
-  
-  Line = ({ x1, y1, x2, y2, stroke, strokeWidth, onPress, ...props }: any) => (
-    <View
-      style={{
-        position: 'absolute',
-        left: Math.min(x1, x2),
-        top: Math.min(y1, y2),
-        width: Math.abs(x2 - x1),
-        height: Math.abs(y2 - y1),
-        backgroundColor: stroke,
-        transform: [{ rotate: `${Math.atan2(y2 - y1, x2 - x1)}rad` }],
-      }}
-      onTouchEnd={onPress}
-      {...props}
-    />
-  );
-  
-  Polygon = ({ points, fill, stroke, strokeWidth, onPress, ...props }: any) => (
-    <View
-      style={{
-        position: 'absolute',
-        backgroundColor: fill,
-        borderWidth: strokeWidth || 0,
-        borderColor: stroke || 'transparent',
-        // Note: Polygon rendering on web is simplified
-      }}
-      onTouchEnd={onPress}
-      {...props}
-    />
-  );
-  
-  SvgImage = ({ x, y, width, height, href, stroke, strokeWidth, onPress, ...props }: any) => (
-    <View
-      style={{
-        position: 'absolute',
-        left: x,
-        top: y,
-        width,
-        height,
-        borderWidth: strokeWidth || 0,
-        borderColor: stroke || 'transparent',
-      }}
-      onTouchEnd={onPress}
-      {...props}
-    >
-      <Text>Image Placeholder</Text>
-    </View>
-  );
-  
-  SvgText = ({ x, y, fontSize, fontFamily, fill, stroke, strokeWidth, onPress, children, ...props }: any) => (
-    <Text
-      style={{
-        position: 'absolute',
-        left: x,
-        top: y,
-        fontSize,
-        fontFamily,
-        color: fill,
-        textShadowColor: stroke,
-        textShadowOffset: { width: strokeWidth || 0, height: strokeWidth || 0 },
-      }}
-      onPress={onPress}
-      {...props}
-    >
-      {children}
-    </Text>
-  );
-}
-
-import ColorPicker from '../../components/ColorPicker';
-import ShapePicker from '../../components/ShapePicker';
-import TextEditor from '../../components/TextEditor';
+import * as Sharing from 'expo-sharing';
+import React, { useRef, useState } from 'react';
+import { Alert, Animated, Button, Dimensions, GestureResponderEvent, Image, Modal, PanResponder, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import Svg, { Path } from 'react-native-svg';
+import ViewShot, { captureRef } from 'react-native-view-shot';
+import { Colors } from '../../constants/Colors';
 import { useDesigns } from '../../contexts/DesignContext';
-import { Element, ImageElement, Shape, TextElement, Tool, useDesignStore } from '../../stores/designStore';
 
-const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
-const CANVAS_WIDTH = screenWidth;
-const CANVAS_HEIGHT = screenHeight * 0.7;
-const SELECTION_PADDING = 10;
-const TEXT_SELECTION_PADDING = 10; // Use same padding as other elements for consistent dragging
-
-const generateId = () => Math.random().toString(36).substr(2, 9);
-
-// Resize handle positions
-type ResizeHandle = 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right' | 'top' | 'right' | 'bottom' | 'left';
-
-interface DragState {
-  isDragging: boolean;
-  startX: number;
-  startY: number;
-  elementStartX: number;
-  elementStartY: number;
-  elementId: string | null;
-  dragOffsetX: number;
-  dragOffsetY: number;
+// Import html2canvas for web
+let html2canvas: any;
+if (Platform.OS === 'web') {
+  try {
+    html2canvas = require('html2canvas').default;
+  } catch (error) {
+    console.warn('html2canvas not available:', error);
+  }
 }
 
-interface ResizeState {
-  isResizing: boolean;
-  handle: ResizeHandle | null;
-  startX: number;
-  startY: number;
-  startWidth: number;
-  startHeight: number;
-  elementId: string | null;
+type IoniconsName = React.ComponentProps<typeof Ionicons>["name"];
+
+const COLOR_PALETTE: string[] = [
+  '#1976D2', '#e74c3c', '#27ae60', '#f1c40f', '#8e44ad', '#fff', '#000',
+  '#FF9800', '#00BCD4', '#9C27B0', '#F44336', '#4CAF50', '#FFC107', '#3F51B5',
+  '#E91E63', '#009688', '#CDDC39', '#FFEB3B', '#795548', '#607D8B', '#BDBDBD',
+];
+
+const FONT_FAMILIES: string[] = ['System', 'Arial', 'Helvetica', 'Times New Roman', 'Georgia'];
+
+const screenWidth = Dimensions.get('window').width;
+const CANVAS_SIZE = Math.min(screenWidth * 0.9, 420);
+
+const SHAPE_OPTIONS = [
+  { type: 'rectangle', label: 'Rectangle', icon: 'square-outline' },
+  { type: 'circle', label: 'Circle', icon: 'ellipse-outline' },
+  { type: 'triangle', label: 'Triangle', icon: 'triangle-outline' },
+  { type: 'line', label: 'Line', icon: 'remove-outline' },
+  { type: 'star', label: 'Star', icon: 'star-outline' },
+  { type: 'heart', label: 'Heart', icon: 'heart-outline' },
+  { type: 'arrow', label: 'Arrow', icon: 'arrow-forward-outline' },
+  { type: 'pentagon', label: 'Pentagon', icon: 'shapes-outline' },
+  { type: 'diamond', label: 'Diamond', icon: 'shapes-outline' },
+  { type: 'cloud', label: 'Cloud', icon: 'cloud-outline' },
+];
+
+const MIN_SHAPE_SIZE = 30;
+
+function getHandlePositions(shape: any) {
+  const { size } = shape;
+  
+  // Different dimensions for different shape types
+  let w, h;
+  if (shape.type === 'rectangle') {
+    w = size;
+    h = size * 0.7;
+  } else if (shape.type === 'line') {
+    w = size;
+    h = 20; // Fixed height for line
+  } else {
+    // For circle, triangle, and icon shapes
+    w = size;
+    h = size;
+  }
+  
+  return {
+    topLeft: { x: 0, y: 0 },
+    top: { x: w / 2, y: 0 },
+    topRight: { x: w, y: 0 },
+    right: { x: w, y: h / 2 },
+    bottomRight: { x: w, y: h },
+    bottom: { x: w / 2, y: h },
+    bottomLeft: { x: 0, y: h },
+    left: { x: 0, y: h / 2 },
+  };
 }
+
+interface ResizeHandleProps {
+  x: number;
+  y: number;
+  onResize: (dx: number, dy: number) => void;
+  style?: any;
+  type: 'corner' | 'side';
+}
+
+const ResizeHandle = ({ x, y, onResize, style, type }: ResizeHandleProps) => {
+  const pan = React.useRef(new Animated.ValueXY({ x: 0, y: 0 })).current;
+  const panResponder = React.useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onPanResponderMove: (e, gesture) => {
+        // Debug log
+        console.log('ResizeHandle move', type, gesture.dx, gesture.dy);
+        onResize(gesture.dx, gesture.dy);
+      },
+      onPanResponderRelease: () => {
+        pan.setValue({ x: 0, y: 0 });
+      },
+    })
+  ).current;
+  
+  const handleSize = type === 'corner' ? 20 : 16;
+  const handleRadius = type === 'corner' ? 10 : 4;
+  const offset = handleSize / 2;
+  
+  return (
+    <Animated.View
+      {...panResponder.panHandlers}
+      style={[
+        {
+          position: 'absolute',
+          left: x - offset,
+          top: y - offset,
+          width: handleSize,
+          height: handleSize,
+          borderRadius: handleRadius,
+          backgroundColor: '#fff',
+          borderWidth: 2,
+          borderColor: type === 'corner' ? '#3478f6' : '#666',
+          shadowColor: '#000',
+          shadowOffset: { width: 0, height: 1 },
+          shadowOpacity: 0.15,
+          shadowRadius: 2,
+          elevation: 2,
+          zIndex: 10,
+        },
+        style,
+      ]}
+    />
+  );
+};
+
+const ImageOnCanvas = ({ image, selected, onPress, draggable, updatePosition, canvasLayout, updateSize }: {
+  image: any;
+  selected?: boolean;
+  onPress?: (e?: GestureResponderEvent) => void;
+  draggable?: boolean;
+  updatePosition?: (x: number, y: number) => void;
+  canvasLayout?: { x: number; y: number; width: number; height: number };
+  updateSize?: (id: number, newWidth: number, newHeight: number, newX: number, newY: number) => void;
+}) => {
+  const pan = React.useRef(new Animated.ValueXY({ x: image.x, y: image.y })).current;
+  const panOffset = React.useRef({ x: image.x, y: image.y });
+  React.useEffect(() => {
+    pan.setValue({ x: image.x, y: image.y });
+    panOffset.current = { x: image.x, y: image.y };
+  }, [image.x, image.y]);
+  const panResponder = React.useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onPanResponderGrant: (evt: GestureResponderEvent, gestureState) => {
+        if (onPress) onPress(evt);
+        // @ts-ignore
+        const { x, y } = pan.__getValue();
+        panOffset.current = { x, y };
+      },
+      onPanResponderMove: (e: GestureResponderEvent, gesture) => {
+        if (!canvasLayout) return;
+        let newX = gesture.dx + panOffset.current.x;
+        let newY = gesture.dy + panOffset.current.y;
+        // Constrain within canvas
+        newX = Math.max(0, Math.min(newX, canvasLayout.width - (image.width || 60)));
+        newY = Math.max(0, Math.min(newY, canvasLayout.height - (image.height || 60)));
+        pan.setValue({ x: newX, y: newY });
+      },
+      onPanResponderRelease: (e: GestureResponderEvent, gesture) => {
+        if (!canvasLayout) return;
+        // @ts-ignore
+        const { x, y } = pan.__getValue();
+        let newX = x;
+        let newY = y;
+        // Constrain within canvas
+        newX = Math.max(0, Math.min(newX, canvasLayout.width - (image.width || 60)));
+        newY = Math.max(0, Math.min(newY, canvasLayout.height - (image.height || 60)));
+        pan.setValue({ x: newX, y: newY });
+        panOffset.current = { x: newX, y: newY };
+        updatePosition && updatePosition(newX, newY);
+      },
+    })
+  ).current;
+  // Resize logic (all handles)
+  const handleResize = (handle: string, dx: number, dy: number) => {
+    if (!updateSize || !canvasLayout) return;
+    let { x, y, width, height } = image;
+    let newX = x, newY = y, newW = width, newH = height;
+    
+    switch (handle) {
+      case 'topLeft':
+        newX = x + dx;
+        newY = y + dy;
+        newW = width - dx;
+        newH = height - dy;
+        break;
+      case 'top':
+        newY = y + dy;
+        newH = height - dy;
+        break;
+      case 'topRight':
+        newY = y + dy;
+        newW = width + dx;
+        newH = height - dy;
+        break;
+      case 'right':
+        newW = width + dx;
+        break;
+      case 'bottomRight':
+        newW = width + dx;
+        newH = height + dy;
+        break;
+      case 'bottom':
+        newH = height + dy;
+        break;
+      case 'bottomLeft':
+        newX = x + dx;
+        newW = width - dx;
+        newH = height + dy;
+        break;
+      case 'left':
+        newX = x + dx;
+        newW = width - dx;
+        break;
+    }
+    
+    // Constrain
+    newW = Math.max(30, Math.min(newW, canvasLayout.width - newX));
+    newH = Math.max(30, Math.min(newH, canvasLayout.height - newY));
+    newX = Math.max(0, Math.min(newX, canvasLayout.width - newW));
+    newY = Math.max(0, Math.min(newY, canvasLayout.height - newH));
+    updateSize(image.id, newW, newH, newX, newY);
+  };
+  return (
+    <Animated.View
+      {...panResponder.panHandlers}
+      style={{
+        position: 'absolute',
+        zIndex: selected ? 2 : 1,
+        borderWidth: selected ? 2 : 0,
+        borderColor: selected ? '#3478f6' : 'transparent',
+        borderRadius: 8,
+        backgroundColor: selected ? '#e6f0ff' : 'transparent',
+        transform: pan.getTranslateTransform(),
+      }}
+    >
+      <Image source={{ uri: image.uri }} style={{ width: image.width, height: image.height, borderRadius: 8 }} resizeMode="contain" />
+      {selected && Object.entries({
+          topLeft: { x: 0, y: 0 },
+        top: { x: image.width / 2, y: 0 },
+          topRight: { x: image.width, y: 0 },
+        right: { x: image.width, y: image.height / 2 },
+          bottomRight: { x: image.width, y: image.height },
+        bottom: { x: image.width / 2, y: image.height },
+          bottomLeft: { x: 0, y: image.height },
+        left: { x: 0, y: image.height / 2 },
+      }).map(([handle, pos]) => (
+          <ResizeHandle
+            key={handle}
+            x={pos.x}
+            y={pos.y}
+            onResize={(dx: number, dy: number) => handleResize(handle, dx, dy)}
+          type={['topLeft','topRight','bottomLeft','bottomRight'].includes(handle) ? 'corner' : 'side'}
+          />
+      ))}
+    </Animated.View>
+  );
+};
+
+const TextOnCanvas = ({ textObj, selected, onPress, draggable, updatePosition, canvasLayout, onDoubleTap }: {
+  textObj: any;
+  selected?: boolean;
+  onPress?: (e?: GestureResponderEvent) => void;
+  draggable?: boolean;
+  updatePosition?: (x: number, y: number) => void;
+  canvasLayout?: { x: number; y: number; width: number; height: number };
+  onDoubleTap?: () => void;
+}) => {
+  const pan = React.useRef(new Animated.ValueXY({ x: textObj.x, y: textObj.y })).current;
+  const panOffset = React.useRef({ x: textObj.x, y: textObj.y });
+  React.useEffect(() => {
+    pan.setValue({ x: textObj.x, y: textObj.y });
+    panOffset.current = { x: textObj.x, y: textObj.y };
+  }, [textObj.x, textObj.y]);
+  // Double tap logic
+  const lastTap = React.useRef(0);
+  const panResponder = React.useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onPanResponderGrant: (evt: GestureResponderEvent, gestureState) => {
+        if (onPress) onPress(evt);
+        const now = Date.now();
+        if (now - lastTap.current < 350) {
+          onDoubleTap && onDoubleTap();
+        }
+        lastTap.current = now;
+        // @ts-ignore
+        const { x, y } = pan.__getValue();
+        panOffset.current = { x, y };
+      },
+      onPanResponderMove: (e, gesture) => {
+        if (!canvasLayout) return;
+        let newX = gesture.dx + panOffset.current.x;
+        let newY = gesture.dy + panOffset.current.y;
+        // Constrain within canvas
+        newX = Math.max(0, Math.min(newX, canvasLayout.width - 120));
+        newY = Math.max(0, Math.min(newY, canvasLayout.height - 40));
+        pan.setValue({ x: newX, y: newY });
+      },
+      onPanResponderRelease: (e, gesture) => {
+        if (!canvasLayout) return;
+        // @ts-ignore
+        const { x, y } = pan.__getValue();
+        let newX = x;
+        let newY = y;
+        // Constrain within canvas
+        newX = Math.max(0, Math.min(newX, canvasLayout.width - 120));
+        newY = Math.max(0, Math.min(newY, canvasLayout.height - 40));
+        pan.setValue({ x: newX, y: newY });
+        panOffset.current = { x: newX, y: newY };
+        updatePosition && updatePosition(newX, newY);
+      },
+    })
+  ).current;
+  return (
+    <Animated.View
+      {...panResponder.panHandlers}
+      style={{
+        position: 'absolute',
+        zIndex: selected ? 2 : 1,
+        borderWidth: selected ? 2 : 0,
+        borderColor: selected ? '#3478f6' : 'transparent',
+        borderRadius: 8,
+        backgroundColor: selected ? '#e6f0ff' : 'transparent',
+        left: 0,
+        top: 0,
+        transform: pan.getTranslateTransform(),
+        padding: 2,
+      }}
+    >
+      {/* Show a visible border/highlight when selected */}
+      <Text style={{ color: textObj.color, fontSize: textObj.fontSize, fontWeight: 'bold', fontFamily: textObj.fontFamily || 'System' }}>{textObj.text}</Text>
+    </Animated.View>
+  );
+};
+
+type CanvaDesignPageProps = {
+  hideHeader?: boolean;
+  hideToolbar?: boolean;
+};
+
+export default function CanvaDesignPage({ hideHeader, hideToolbar }: CanvaDesignPageProps) {
+  const router = useRouter();
+  const searchParams = useLocalSearchParams();
+  const { addDesign } = useDesigns();
+  const [canvasBgColor, setCanvasBgColor] = useState('#fff'); // 1. Add canvas background color state
+  const [canvasFocused, setCanvasFocused] = useState(false);
+  const [toolsOpen, setToolsOpen] = useState(false);
+  const [activeTool, setActiveTool] = useState<string | null>(null);
+  const [shapePickerOpen, setShapePickerOpen] = useState(false);
+  const [canvasShapes, setCanvasShapes] = useState<any[]>([]);
+  const [selectedShapeId, setSelectedShapeId] = useState<number | null>(null);
+  const [canvasLayout, setCanvasLayout] = useState({ x: 0, y: 0, width: CANVAS_SIZE, height: CANVAS_SIZE * 1.15 });
+  const [toolbarPos, setToolbarPos] = useState<{ x: number; y: number } | null>(null);
+  const [colorPickerOpen, setColorPickerOpen] = useState(false);
+  const [drawToolActive, setDrawToolActive] = useState(false);
+  const [selectedDrawTool, setSelectedDrawTool] = useState<'pencil' | 'marker' | 'eraser'>('pencil');
+  const [drawThickness, setDrawThickness] = useState(3);
+  const [showThicknessSlider, setShowThicknessSlider] = useState(false);
+  const [drawPaths, setDrawPaths] = useState<any[]>([]);
+  const [currentPath, setCurrentPath] = useState<any | null>(null);
+  const [pencilColor, setPencilColor] = useState('#222');
+  const [drawColorPickerOpen, setDrawColorPickerOpen] = useState(false);
+  const [canvasImages, setCanvasImages] = useState<any[]>([]);
+  // 1. Add state for text elements and text editing
+  const [canvasTexts, setCanvasTexts] = useState<any[]>([]);
+  const [editingTextId, setEditingTextId] = useState<number | null>(null);
+  const [textModalVisible, setTextModalVisible] = useState(false);
+  const [textInputValue, setTextInputValue] = useState('');
+  const [textInputColor, setTextInputColor] = useState('#222');
+  const [textInputFontSize, setTextInputFontSize] = useState(20);
+  const [textInputFontFamily, setTextInputFontFamily] = useState('System');
+  const [showTextColorPicker, setShowTextColorPicker] = useState(false);
+  const [showTextSizePicker, setShowTextSizePicker] = useState(false);
+  const [showTextFontFamilyPicker, setShowTextFontFamilyPicker] = useState(false);
+  const [undoStack, setUndoStack] = useState<any[]>([]);
+  const [showCanvasColorPicker, setShowCanvasColorPicker] = useState(false);
+  const [canvasNote, setCanvasNote] = useState('');
+  const [showNoteModal, setShowNoteModal] = useState(false);
+  const [canvasAnim] = useState(new Animated.Value(1));
+
+  const designRef = useRef(null);
+
+  // Save state to undo stack only when state changes
+  React.useEffect(() => {
+    setUndoStack((prev) => {
+      const last = prev[0];
+      if (
+        last &&
+        JSON.stringify(last.canvasShapes) === JSON.stringify(canvasShapes) &&
+        JSON.stringify(last.canvasImages) === JSON.stringify(canvasImages) &&
+        JSON.stringify(last.drawPaths) === JSON.stringify(drawPaths) &&
+        JSON.stringify(last.canvasTexts) === JSON.stringify(canvasTexts)
+      ) {
+        return prev;
+      }
+      return [
+        {
+          canvasShapes,
+          canvasImages,
+          drawPaths,
+          canvasTexts,
+        },
+        ...prev.slice(0, 19), // keep up to 20 undos
+      ];
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [canvasShapes, canvasImages, drawPaths, canvasTexts]);
+  // Undo handler
+  const handleUndo = () => {
+    if (undoStack.length > 1) {
+      const prev = undoStack[1];
+      setCanvasShapes(prev.canvasShapes);
+      setCanvasImages(prev.canvasImages);
+      setDrawPaths(prev.drawPaths);
+      setCanvasTexts(prev.canvasTexts);
+      setUndoStack(undoStack.slice(1));
+    }
+  };
+
+  const selectedText = canvasTexts.find(txt => txt.id === selectedShapeId);
+
+  // Clear canvas if ?new= param is present (fresh design)
+  React.useEffect(() => {
+    if (searchParams?.new) {
+      setCanvasShapes([]);
+      setCanvasImages([]);
+      setDrawPaths([]);
+      setCanvasTexts([]);
+      setSelectedShapeId(null);
+      setCanvasBgColor('#fff');
+      setUndoStack([]);
+    }
+  }, [searchParams?.new]);
+
+  // Load design data if ?edit= param is present (editing existing design)
+  React.useEffect(() => {
+    if (searchParams?.edit && searchParams?.designData) {
+      try {
+        const designData = JSON.parse(searchParams.designData as string);
+        const canvasBgColorParam = searchParams.canvasBgColor as string;
+        
+        setCanvasShapes(designData.canvasShapes || []);
+        setCanvasImages(designData.canvasImages || []);
+        setDrawPaths(designData.drawPaths || []);
+        setCanvasTexts(designData.canvasTexts || []);
+        setCanvasBgColor(canvasBgColorParam || '#fff');
+        setSelectedShapeId(null);
+        setUndoStack([]);
+        
+        console.log('Loaded design for editing:', designData);
+      } catch (error) {
+        console.error('Error loading design data:', error);
+        Alert.alert('Error', 'Failed to load design data');
+      }
+    }
+  }, [searchParams?.edit, searchParams?.designData, searchParams?.canvasBgColor]);
+
+  const handleToolboxPress = async (tool: string) => {
+    if (tool === 'Tools') {
+      setToolsOpen((prev) => !prev);
+      setActiveTool(null);
+      setShapePickerOpen(false);
+    } else if (tool === 'Images') {
+      setToolsOpen(false);
+      setActiveTool(null);
+      setShapePickerOpen(false);
+      // Image picker logic
+      let result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: false,
+        quality: 1,
+      });
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        const asset = result.assets[0];
+        const newImage = {
+          id: Date.now(),
+          uri: asset.uri,
+          x: 40 + Math.random() * 60,
+          y: 40 + Math.random() * 60,
+          width: 120,
+          height: 120,
+        };
+        setCanvasImages((prev) => [...prev, newImage]);
+      }
+    } else if (tool === 'Text') {
+      setToolsOpen(false);
+      setActiveTool(null);
+      setShapePickerOpen(false);
+      // Add new text element and open modal
+      const newId = Date.now();
+      const newText = {
+        id: newId,
+        text: 'Double tap to edit',
+        x: 60 + Math.random() * 60,
+        y: 60 + Math.random() * 60,
+        color: '#222',
+        fontSize: 20,
+        fontFamily: 'System',
+      };
+      setCanvasTexts((prev) => [...prev, newText]);
+      setSelectedShapeId(newId);
+      setEditingTextId(newId);
+      setTextInputValue('Double tap to edit');
+      setTextInputColor('#222');
+      setTextInputFontSize(20);
+      setTextInputFontFamily(newText.fontFamily || 'System');
+      setTextModalVisible(true);
+    } else {
+      setToolsOpen(false);
+      setActiveTool(null);
+      setShapePickerOpen(false);
+    }
+  };
+
+  const handleToolsToolboxPress = (tool: string) => {
+    setActiveTool(tool);
+    if (tool === 'Draw') {
+      setDrawToolActive(true);
+      setShapePickerOpen(false);
+    } else if (tool === 'Shapes') {
+      setShapePickerOpen(true);
+      setDrawToolActive(false);
+    } else {
+      setDrawToolActive(false);
+      setShapePickerOpen(false);
+    }
+  };
+
+  const handleShapeSelect = (shapeType: string) => {
+    const newShape = {
+      id: Date.now(),
+      type: shapeType,
+      x: 40 + Math.random() * 60,
+      y: 40 + Math.random() * 60,
+      size: 60,
+      color: '#1976D2',
+    };
+    setCanvasShapes((prev) => [...prev, newShape]);
+    setShapePickerOpen(false);
+    setActiveTool(null);
+    setSelectedShapeId(newShape.id);
+  };
+
+  const handleCanvasPress = (e: any) => {
+    // Only select canvas if user taps background (not a shape)
+    setCanvasFocused(true);
+    setSelectedShapeId(null);
+  };
+
+  const handleShapePress = (id: number, e?: GestureResponderEvent) => {
+    if (e && e.stopPropagation) e.stopPropagation();
+    setSelectedShapeId(id);
+    setCanvasFocused(false);
+  };
+  const handleImagePress = (id: number, e?: GestureResponderEvent) => {
+    if (e && e.stopPropagation) e.stopPropagation();
+    setSelectedShapeId(id);
+    setCanvasFocused(false);
+  };
+
+  // Update shape position in state
+  const updateShapePosition = (id: number, newX: number, newY: number) => {
+    setCanvasShapes((prev) =>
+      prev.map((shape) =>
+        shape.id === id ? { ...shape, x: newX, y: newY } : shape
+      )
+    );
+  };
+
+  const updateShapeSize = (id: number, newSize: number, newX: number, newY: number) => {
+    // Debug log
+    console.log('updateShapeSize', { id, newSize, newX, newY });
+    setCanvasShapes((prev) =>
+      prev.map((shape) =>
+        shape.id === id ? { ...shape, size: newSize, x: newX, y: newY } : shape
+      )
+    );
+  };
+
+  // Delete shape
+  const deleteSelectedShape = () => {
+    if (canvasTexts.some(txt => txt.id === selectedShapeId)) {
+      setCanvasTexts(prev => prev.filter(txt => txt.id !== selectedShapeId));
+      setSelectedShapeId(null);
+      return;
+    }
+    if (canvasImages.some(img => img.id === selectedShapeId)) {
+      setCanvasImages(prev => prev.filter(img => img.id !== selectedShapeId));
+      setSelectedShapeId(null);
+      return;
+    }
+    setCanvasShapes(prev => prev.filter(s => s.id !== selectedShapeId));
+    setSelectedShapeId(null);
+  };
+
+  // Add deleteSelectedText function
+  const deleteSelectedText = () => {
+    setCanvasTexts((prev) => prev.filter((txt) => txt.id !== selectedShapeId));
+    setSelectedShapeId(null);
+  };
+
+  // Change background color (placeholder)
+  const changeShapeColor = (color: string) => {
+    if (canvasFocused && !selectedShapeId) {
+      setCanvasBgColor(color);
+      setColorPickerOpen(false);
+      return;
+    }
+    
+    // Check if selected element is text
+    const selectedText = canvasTexts.find(txt => txt.id === selectedShapeId);
+    if (selectedText) {
+      setCanvasTexts(prev => prev.map(txt => txt.id === selectedShapeId ? { ...txt, color } : txt));
+      setColorPickerOpen(false);
+      return;
+    }
+    
+    // Handle shapes
+    setCanvasShapes((prev) =>
+      prev.map((shape) =>
+        shape.id === selectedShapeId ? { ...shape, color } : shape
+      )
+    );
+    setColorPickerOpen(false);
+  };
+
+  // Add image manipulation logic
+  const updateImagePosition = (id: number, newX: number, newY: number) => {
+    setCanvasImages((prev) =>
+      prev.map((img) =>
+        img.id === id ? { ...img, x: newX, y: newY } : img
+      )
+    );
+  };
+  const updateImageSize = (id: number, newWidth: number, newHeight: number, newX: number, newY: number) => {
+    setCanvasImages((prev) =>
+      prev.map((img) =>
+        img.id === id ? { ...img, width: newWidth, height: newHeight, x: newX, y: newY } : img
+      )
+    );
+  };
+
+  // Add deleteSelectedImage function
+  const deleteSelectedImage = () => {
+    setCanvasImages((prev) => prev.filter((img) => img.id !== selectedShapeId));
+    setSelectedShapeId(null);
+  };
+
+  // Update toolbarPos calculation to support images
+  React.useEffect(() => {
+    if (!selectedShapeId) {
+      setToolbarPos(null);
+      return;
+    }
+    const shape = canvasShapes.find((s) => s.id === selectedShapeId);
+    if (shape) {
+      const w = shape.type === 'rectangle' ? shape.size : shape.size;
+      const h = shape.type === 'rectangle' ? shape.size * 0.7 : shape.size;
+      setToolbarPos({ x: shape.x + w / 2, y: Math.max(shape.y - 32, 0) });
+      return;
+    }
+    const image = canvasImages.find((img) => img.id === selectedShapeId);
+    if (image) {
+      setToolbarPos({ x: image.x + image.width / 2, y: Math.max(image.y - 32, 0) });
+      return;
+    }
+    const text = canvasTexts.find((txt) => txt.id === selectedShapeId);
+    if (text) {
+      // Estimate text width: fontSize * 0.6 * text.length
+      const width = (text.fontSize || 16) * 0.6 * (text.text?.length || 1);
+      setToolbarPos({ x: text.x + width / 2, y: Math.max(text.y - 32, 0) });
+      return;
+    }
+    setToolbarPos(null);
+  }, [selectedShapeId, canvasShapes, canvasImages, canvasTexts]);
+
+  // Drawing logic on canvas
+  const getDrawColor = () => {
+    if (selectedDrawTool === 'pencil') return pencilColor;
+    if (selectedDrawTool === 'marker') return 'rgba(124,58,237,0.5)'; // purple, semi-transparent
+    if (selectedDrawTool === 'eraser') return '#fff'; // canvas background
+    return '#222';
+  };
+  const getDrawOpacity = () => {
+    if (selectedDrawTool === 'marker') return 0.5;
+    return 1;
+  };
+  const handleDrawStart = (e: any) => {
+    if (!drawToolActive) return;
+    const { locationX, locationY } = e.nativeEvent;
+    setCurrentPath({
+      tool: selectedDrawTool,
+      color: getDrawColor(),
+      thickness: drawThickness,
+      points: [`${locationX},${locationY}`],
+    });
+  };
+  const handleDrawMove = (e: any) => {
+    if (!drawToolActive) return;
+    if (!currentPath) return;
+    const { locationX, locationY } = e.nativeEvent;
+    setCurrentPath((prev: any) => prev ? {
+      ...prev,
+      points: [...prev.points, `${locationX},${locationY}`],
+    } : prev);
+  };
+  const handleDrawEnd = () => {
+    if (!drawToolActive) return;
+    if (currentPath && currentPath.points.length > 1) {
+      setDrawPaths((prev) => [...prev, currentPath]);
+    }
+    setCurrentPath(null);
+  };
+
+  // Add a function to clear the canvas
+  const clearCanvas = () => {
+    setCanvasShapes([]);
+    setCanvasImages([]);
+    setDrawPaths([]);
+    setCanvasTexts([]); // Clear all text elements
+    setSelectedShapeId(null);
+  };
+
+  // 5. Text element selection logic
+  const handleTextPress = (id: number, e?: GestureResponderEvent) => {
+    if (e && e.stopPropagation) e.stopPropagation();
+    setSelectedShapeId(id); // Always set selection
+    setCanvasFocused(false);
+  };
+  const updateTextPosition = (id: number, newX: number, newY: number) => {
+    setCanvasTexts((prev) => prev.map((txt) => txt.id === id ? { ...txt, x: newX, y: newY } : txt));
+  };
+
+  const handleCanvasColor = () => setShowCanvasColorPicker(true);
+  const handleCanvasAnimate = () => {
+    Animated.sequence([
+      Animated.timing(canvasAnim, { toValue: 1.05, duration: 120, useNativeDriver: true }),
+      Animated.timing(canvasAnim, { toValue: 0.95, duration: 120, useNativeDriver: true }),
+      Animated.timing(canvasAnim, { toValue: 1, duration: 120, useNativeDriver: true }),
+    ]).start();
+  };
+  const handleCanvasNote = () => setShowNoteModal(true);
+
+  const handleExport = async () => {
+    try {
+      console.log('Starting export process...');
+      let uri: string;
+      
+      if (Platform.OS === 'web') {
+        // Web implementation using html2canvas
+        if (!html2canvas) {
+          // Fallback: create a simple data URL with canvas content
+          console.log('html2canvas not available, using fallback...');
+          const canvas = document.createElement('canvas');
+          canvas.width = 420;
+          canvas.height = 483;
+          const ctx = canvas.getContext('2d');
+          if (ctx) {
+            // Fill background
+            ctx.fillStyle = canvasBgColor;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            // Add a simple text indicating the design
+            ctx.fillStyle = '#000';
+            ctx.font = '16px Arial';
+            ctx.fillText('Design saved', 20, 40);
+            ctx.fillText(`Shapes: ${canvasShapes.length}`, 20, 60);
+            ctx.fillText(`Texts: ${canvasTexts.length}`, 20, 80);
+            ctx.fillText(`Images: ${canvasImages.length}`, 20, 100);
+          }
+          uri = canvas.toDataURL('image/png');
+        } else {
+          const canvasElement = designRef.current;
+          if (!canvasElement) {
+            throw new Error('Canvas element not found');
+          }
+          
+          console.log('Capturing canvas with html2canvas...');
+          const canvas = await html2canvas(canvasElement, {
+            backgroundColor: canvasBgColor,
+            scale: 2, // Higher quality
+            useCORS: true,
+            allowTaint: true,
+          });
+          
+          uri = canvas.toDataURL('image/png');
+        }
+        console.log('Captured image URI (web):', uri.substring(0, 100) + '...');
+      } else {
+        // Mobile implementation using react-native-view-shot
+        uri = await captureRef(designRef, { format: 'png', quality: 1 });
+        console.log('Captured image URI (mobile):', uri);
+      }
+      
+      // Save to YourStories
+      const designData = {
+        id: Date.now().toString(),
+        title: `Design ${new Date().toLocaleDateString()}`,
+        imageUri: uri,
+        date: new Date().toISOString(),
+        designData: {
+          canvasShapes,
+          canvasImages,
+          drawPaths,
+          canvasTexts,
+          canvasBgColor,
+        },
+      };
+
+      console.log('Design data to save:', designData);
+
+      // Save to DesignContext for Recent Designs
+      addDesign({
+        id: designData.id,
+        label: designData.title,
+        image: uri,
+        elements: [
+          ...canvasShapes,
+          ...canvasImages,
+          ...drawPaths,
+          ...canvasTexts,
+        ],
+        canvasBackgroundColor: canvasBgColor,
+        isCompleted: true,
+      });
+
+      // Get existing stories
+      const existingStories = await AsyncStorage.getItem('yourStories');
+      console.log('Existing stories from storage:', existingStories);
+      const stories = existingStories ? JSON.parse(existingStories) : [];
+      console.log('Parsed stories array:', stories);
+      
+      // Add new design
+      stories.unshift(designData);
+      console.log('Updated stories array:', stories);
+      
+      // Save back to storage
+      await AsyncStorage.setItem('yourStories', JSON.stringify(stories));
+      console.log('Successfully saved to AsyncStorage');
+      
+      if (Platform.OS === 'web') {
+        // Web download
+        const a = document.createElement('a');
+        a.href = uri;
+        a.download = 'canvas-design.png';
+        a.click();
+        Alert.alert('Saved!', 'Design saved to Your Stories and downloaded.');
+      } else {
+        // Mobile share
+        await Sharing.shareAsync(uri);
+        Alert.alert('Saved!', 'Design saved to Your Stories.');
+      }
+    } catch (e: any) {
+      console.error('Export error:', e);
+      Alert.alert('Save failed', e.message);
+    }
+  };
+
+  // 6. Text editing modal
+  return (
+    <View style={{ flex: 1, backgroundColor: Colors.light.background }}>
+      {/* Header */}
+      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingTop: 36, paddingBottom: 12, paddingHorizontal: 16, backgroundColor: Colors.light.tint, borderBottomWidth: 0, zIndex: 100, elevation: 8 }}>
+        <TouchableOpacity onPress={() => router.back()} style={{ padding: 8, borderRadius: 8 }}>
+          <Ionicons name="arrow-back" size={26} color="#fff" />
+        </TouchableOpacity>
+        <TouchableOpacity onPress={handleExport} style={{ padding: 8, borderRadius: 8 }}>
+          <Ionicons name="download-outline" size={26} color="#fff" />
+        </TouchableOpacity>
+        <TouchableOpacity onPress={() => router.push('/(drawer)/TimerScreen')} style={{ padding: 8, borderRadius: 8 }}>
+          <Ionicons name="time-outline" size={26} color="#fff" />
+        </TouchableOpacity>
+        <TouchableOpacity onPress={handleUndo} style={{ padding: 8, borderRadius: 8 }} disabled={undoStack.length <= 1}>
+          <Ionicons name="arrow-undo" size={26} color={undoStack.length > 1 ? '#fff' : '#eee'} />
+        </TouchableOpacity>
+      </View>
+      <View style={styles.centeredContent}>
+        <ViewShot ref={designRef}>
+        <View
+          style={[styles.canvas, canvasFocused && styles.canvasFocused, { backgroundColor: canvasBgColor }]} // 3. Use dynamic bg color
+          onLayout={e => {
+            const { x, y, width, height } = e.nativeEvent.layout;
+            setCanvasLayout({ x, y, width, height });
+          }}
+          {...(drawToolActive ? {
+            onStartShouldSetResponder: () => true,
+            onResponderGrant: handleDrawStart,
+            onResponderMove: handleDrawMove,
+            onResponderRelease: handleDrawEnd,
+          } : {
+            onStartShouldSetResponder: () => true,
+            onResponderRelease: handleCanvasPress,
+          })}
+        >
+          {/* Render shapes on canvas */}
+          {canvasShapes.map((shape) => (
+            <ShapeOnCanvas
+              key={shape.id}
+              shape={shape}
+              selected={selectedShapeId === shape.id}
+              onPress={(e) => handleShapePress(shape.id, e)}
+              draggable={selectedShapeId === shape.id}
+              updatePosition={(x, y) => updateShapePosition(shape.id, x, y)}
+              updateSize={updateShapeSize}
+              canvasLayout={canvasLayout}
+            />
+          ))}
+          {/* Render images on the canvas, similar to shapes */}
+          {canvasImages.map((img) => (
+            <ImageOnCanvas
+              key={img.id}
+              image={img}
+              selected={selectedShapeId === img.id}
+              onPress={(e) => handleImagePress(img.id, e)}
+              draggable={selectedShapeId === img.id}
+              updatePosition={(x, y) => updateImagePosition(img.id, x, y)}
+              updateSize={updateImageSize}
+              canvasLayout={canvasLayout}
+            />
+          ))}
+          {/* Render text elements on the canvas */}
+          {canvasTexts.map((txt) => (
+            <TextOnCanvas
+              key={txt.id}
+              textObj={txt}
+              selected={selectedShapeId === txt.id}
+              onPress={(e) => handleTextPress(txt.id, e)}
+              draggable={selectedShapeId === txt.id}
+              updatePosition={(x, y) => updateTextPosition(txt.id, x, y)}
+              canvasLayout={canvasLayout}
+              onDoubleTap={() => {
+                setEditingTextId(txt.id);
+                setTextInputValue(txt.text);
+                setTextInputColor(txt.color);
+                setTextInputFontSize(txt.fontSize);
+                setTextInputFontFamily(txt.fontFamily || 'System');
+                setTextModalVisible(true);
+              }}
+            />
+          ))}
+            {/* Text editing toolbar - appears when text is selected */}
+            {selectedShapeId && canvasTexts.find(txt => txt.id === selectedShapeId) && (
+              <View style={[styles.textToolbar, { left: (toolbarPos?.x ?? 0) - 60, top: (toolbarPos?.y ?? 0) - 48 }]}>
+                    <TouchableOpacity style={styles.toolbarBtn} onPress={deleteSelectedShape}>
+                      <Ionicons name="trash-outline" size={22} color="#e74c3c" />
+                    </TouchableOpacity>
+                    <TouchableOpacity style={styles.toolbarBtn} onPress={() => setColorPickerOpen(true)}>
+                      <Ionicons name="color-palette-outline" size={22} color="#3478f6" />
+                    </TouchableOpacity>
+                <TouchableOpacity style={styles.toolbarBtn} onPress={() => {
+                  const selectedText = canvasTexts.find(txt => txt.id === selectedShapeId);
+                  if (selectedText) {
+                    setEditingTextId(selectedText.id);
+                    setTextInputValue(selectedText.text);
+                    setTextInputColor(selectedText.color);
+                    setTextInputFontSize(selectedText.fontSize);
+                    setTextInputFontFamily(selectedText.fontFamily || 'System');
+                    setTextModalVisible(true);
+                  }
+                }}>
+                  <Ionicons name="create-outline" size={22} color="#27ae60" />
+                </TouchableOpacity>
+                  </View>
+            )}
+            {/* Image editing toolbar - appears when image is selected */}
+            {selectedShapeId && canvasImages.find(img => img.id === selectedShapeId) && (
+              <View style={[styles.imageToolbar, { left: (toolbarPos?.x ?? 0) - 40, top: (toolbarPos?.y ?? 0) - 48 }]}>
+                    <TouchableOpacity style={styles.toolbarBtn} onPress={deleteSelectedImage}>
+                      <Ionicons name="trash-outline" size={22} color="#e74c3c" />
+                    </TouchableOpacity>
+                  </View>
+            )}
+            {/* Shape editing toolbar - appears when shape is selected */}
+            {selectedShapeId && canvasShapes.find(shape => shape.id === selectedShapeId) && (
+              <View style={[styles.shapeToolbar, { left: (toolbarPos?.x ?? 0) - 60, top: (toolbarPos?.y ?? 0) - 48 }]}>
+                <TouchableOpacity style={styles.toolbarBtn} onPress={deleteSelectedShape}>
+                      <Ionicons name="trash-outline" size={22} color="#e74c3c" />
+                    </TouchableOpacity>
+                <TouchableOpacity style={styles.toolbarBtn} onPress={() => setColorPickerOpen(true)}>
+                  <Ionicons name="color-palette-outline" size={22} color="#3478f6" />
+                    </TouchableOpacity>
+                  </View>
+          )}
+            {/* REMOVED: Floating toolbar for selected shape or canvas */}
+          {/* Simple color picker (placeholder) */}
+          {colorPickerOpen && (
+            <View style={styles.colorPickerPopup}>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.colorPickerScroll}>
+                {COLOR_PALETTE.map((color: string) => (
+                  <TouchableOpacity
+                    key={color}
+                    style={[styles.colorSwatch, { backgroundColor: color },
+                      selectedShapeId && canvasShapes.find(s => s.id === selectedShapeId)?.color === color ? styles.selectedSwatch : null
+                    ]}
+                    onPress={() => changeShapeColor(color)}
+                  />
+                ))}
+              </ScrollView>
+            </View>
+          )}
+          {/* Render drawn paths */}
+          <Svg style={StyleSheet.absoluteFill}>
+            {drawPaths.map((path, idx) => (
+              <Path
+                key={idx}
+                d={`M${path.points.join(' L')}`}
+                stroke={path.color}
+                strokeWidth={path.thickness}
+                fill="none"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                opacity={path.tool === 'marker' ? 0.5 : 1}
+              />
+            ))}
+            {currentPath && (
+              <Path
+                d={`M${currentPath.points.join(' L')}`}
+                stroke={currentPath.color}
+                strokeWidth={currentPath.thickness}
+                fill="none"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                opacity={currentPath.tool === 'marker' ? 0.5 : 1}
+              />
+            )}
+          </Svg>
+        </View>
+        </ViewShot>
+      </View>
+      {/* Toolbox */}
+      {!hideToolbar && (
+      <View style={styles.toolboxContainer}>
+        {/* Shape picker overlays and covers the sub toolbox */}
+        {shapePickerOpen && (
+          <ShapePicker onSelect={handleShapeSelect} onClose={() => { setShapePickerOpen(false); setActiveTool(null); }} />
+        )}
+        {drawToolActive && (
+          <View style={styles.drawToolbar}>
+            <TouchableOpacity
+              style={[styles.drawToolBtn, selectedDrawTool === 'pencil' && styles.drawToolBtnSelected]}
+              onPress={() => setSelectedDrawTool('pencil')}
+            >
+              <Ionicons name="pencil-outline" size={24} color={selectedDrawTool === 'pencil' ? pencilColor : '#888'} />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.drawToolBtn, selectedDrawTool === 'marker' && styles.drawToolBtnSelected]}
+              onPress={() => setSelectedDrawTool('marker')}
+            >
+              <Ionicons name="brush-outline" size={24} color={selectedDrawTool === 'marker' ? '#3478f6' : '#888'} />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.drawToolBtn, selectedDrawTool === 'eraser' && styles.drawToolBtnSelected]}
+              onPress={() => setSelectedDrawTool('eraser')}
+            >
+              <Ionicons name="remove-circle-outline" size={24} color={selectedDrawTool === 'eraser' ? '#e74c3c' : '#888'} />
+            </TouchableOpacity>
+            {/* Pencil color picker button */}
+            {selectedDrawTool === 'pencil' && (
+              <TouchableOpacity style={styles.thicknessBtn} onPress={() => setDrawColorPickerOpen(true)}>
+                <Ionicons name="color-palette-outline" size={22} color={pencilColor} />
+              </TouchableOpacity>
+            )}
+            {/* Thickness selector button */}
+            <TouchableOpacity style={styles.thicknessBtn} onPress={() => setShowThicknessSlider(true)}>
+              <View style={{ width: drawThickness, height: drawThickness, borderRadius: drawThickness / 2, backgroundColor: '#3478f6' }} />
+            </TouchableOpacity>
+            {/* Close button for draw toolbar */}
+            <TouchableOpacity style={styles.thicknessSliderClose} onPress={() => { setDrawToolActive(false); setActiveTool(null); }}>
+              <Ionicons name="close" size={24} color="#888" />
+            </TouchableOpacity>
+            {/* Color picker popup for pencil */}
+            {drawColorPickerOpen && (
+              <View style={[styles.colorPickerPopup, { top: -70, left: undefined, right: 0, transform: [] }]}> 
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.colorPickerScroll}>
+                  {COLOR_PALETTE.map((color: string) => (
+                    <TouchableOpacity
+                      key={color}
+                      style={[styles.colorSwatch, { backgroundColor: color }, pencilColor === color ? styles.selectedSwatch : null]}
+                      onPress={() => { setPencilColor(color); setDrawColorPickerOpen(false); }}
+                    />
+                  ))}
+                </ScrollView>
+              </View>
+            )}
+          </View>
+        )}
+        {/* Thickness slider popup */}
+        {showThicknessSlider && (
+          <View style={styles.thicknessSliderPopup}>
+            <Slider
+              style={{ width: '80%', height: 40 }}
+              minimumValue={1}
+              maximumValue={20}
+              step={1}
+              value={drawThickness}
+              onValueChange={setDrawThickness}
+              minimumTrackTintColor="#3478f6"
+              maximumTrackTintColor="#eee"
+              thumbTintColor="#3478f6"
+            />
+            <TouchableOpacity style={styles.thicknessSliderClose} onPress={() => setShowThicknessSlider(false)}>
+              <Ionicons name="close" size={24} color="#888" />
+            </TouchableOpacity>
+          </View>
+        )}
+        {!shapePickerOpen && drawToolActive && (
+          // draw toolbar is already rendered above
+          null
+        )}
+        {!shapePickerOpen && !drawToolActive && toolsOpen && (
+          <ToolsToolbox
+            onToolPress={handleToolsToolboxPress}
+            activeTool={activeTool}
+          />
+        )}
+        <Toolbox
+          visible={!canvasFocused}
+          onToolPress={handleToolboxPress}
+          toolsOpen={toolsOpen}
+        />
+        {canvasFocused && <CanvasOptions onClose={() => setCanvasFocused(false)} onDeleteAll={clearCanvas} onColor={handleCanvasColor} onAnimate={handleCanvasAnimate} onNote={handleCanvasNote} />}
+      </View>
+      )}
+      {/* Text editing modal */}
+      <Modal visible={textModalVisible} transparent animationType="fade">
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.2)' }}>
+          <View style={{ backgroundColor: '#fff', borderRadius: 16, padding: 20, width: 300 }}>
+            <Text style={{ fontWeight: 'bold', fontSize: 18, marginBottom: 8 }}>Edit Text</Text>
+            <TextInput
+              value={textInputValue}
+              onChangeText={setTextInputValue}
+              style={{ borderWidth: 1, borderColor: '#ccc', borderRadius: 8, padding: 8, marginBottom: 12, fontSize: textInputFontSize, color: textInputColor }}
+            />
+            <Text style={{ marginBottom: 4 }}>Font Size</Text>
+            <TextInput
+              value={String(textInputFontSize)}
+              onChangeText={v => setTextInputFontSize(Number(v) || 16)}
+              keyboardType="numeric"
+              style={{ borderWidth: 1, borderColor: '#ccc', borderRadius: 8, padding: 6, marginBottom: 12 }}
+            />
+            <Text style={{ marginBottom: 4 }}>Font Family</Text>
+            <View style={{ flexDirection: 'row', marginBottom: 12 }}>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ flexDirection: 'row', alignItems: 'center' }}>
+                {FONT_FAMILIES.map((family: string) => (
+                  <TouchableOpacity
+                    key={family}
+                    style={{
+                      paddingHorizontal: 10,
+                      paddingVertical: 6,
+                      borderRadius: 8,
+                      backgroundColor: textInputFontFamily === family ? '#e6f0ff' : '#f5f6fa',
+                      marginHorizontal: 4,
+                    }}
+                    onPress={() => setTextInputFontFamily(family)}
+                  >
+                    <Text style={{ fontFamily: family, fontSize: 16, color: '#222' }}>{family}</Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            </View>
+            <Text style={{ marginBottom: 4 }}>Color</Text>
+            <View style={{ flexDirection: 'row', marginBottom: 12 }}>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ flexDirection: 'row', alignItems: 'center' }}>
+                {COLOR_PALETTE.map((color) => (
+                  <TouchableOpacity
+                    key={color}
+                    style={{
+                      width: 28,
+                      height: 28,
+                      borderRadius: 14,
+                      marginHorizontal: 4,
+                      backgroundColor: color,
+                      borderWidth: textInputColor === color ? 3 : 2,
+                      borderColor: textInputColor === color ? '#3478f6' : '#eee',
+                    }}
+                    onPress={() => setTextInputColor(color)}
+                  />
+                ))}
+              </ScrollView>
+            </View>
+            <TextInput
+              value={textInputColor}
+              onChangeText={setTextInputColor}
+              style={{ borderWidth: 1, borderColor: '#ccc', borderRadius: 8, padding: 6, marginBottom: 12 }}
+            />
+            <View style={{ flexDirection: 'row', justifyContent: 'flex-end' }}>
+              <Button title="Cancel" onPress={() => setTextModalVisible(false)} />
+              <View style={{ width: 12 }} />
+              <Button title="Save" onPress={() => {
+                setCanvasTexts((prev) => prev.map((txt) => txt.id === editingTextId ? { ...txt, text: textInputValue, color: textInputColor, fontSize: textInputFontSize, fontFamily: textInputFontFamily } : txt));
+                setTextModalVisible(false);
+              }} />
+            </View>
+          </View>
+        </View>
+      </Modal>
+      {/* Font color picker popup */}
+      <Modal visible={showTextColorPicker} transparent animationType="fade">
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.2)' }}>
+          <View style={{ backgroundColor: '#fff', borderRadius: 16, padding: 20, minWidth: 220 }}>
+            <Text style={{ fontWeight: 'bold', fontSize: 16, marginBottom: 8 }}>Text Color</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ flexDirection: 'row', alignItems: 'center' }}>
+              {COLOR_PALETTE.map((color: string) => (
+                <TouchableOpacity
+                  key={color}
+                  style={{
+                    width: 28,
+                    height: 28,
+                    borderRadius: 14,
+                    marginHorizontal: 4,
+                    backgroundColor: color,
+                    borderWidth: selectedText && selectedText.color === color ? 3 : 2,
+                    borderColor: selectedText && selectedText.color === color ? '#3478f6' : '#eee',
+                  }}
+                  onPress={() => {
+                    setCanvasTexts((prev) => prev.map((txt) => txt.id === selectedText.id ? { ...txt, color } : txt));
+                    setShowTextColorPicker(false);
+                  }}
+                />
+              ))}
+            </ScrollView>
+            <Button title="Close" onPress={() => setShowTextColorPicker(false)} />
+          </View>
+        </View>
+      </Modal>
+      {/* Font size picker popup */}
+      <Modal visible={showTextSizePicker} transparent animationType="fade">
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.2)' }}>
+          <View style={{ backgroundColor: '#fff', borderRadius: 16, padding: 20, minWidth: 220 }}>
+            <Text style={{ fontWeight: 'bold', fontSize: 16, marginBottom: 8 }}>Font Size</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ flexDirection: 'row', alignItems: 'center' }}>
+              {[12, 14, 16, 18, 20, 24, 28, 32, 36, 48, 64, 72].map((size: number) => (
+                <TouchableOpacity
+                  key={size}
+                  style={{
+                    paddingHorizontal: 10,
+                    paddingVertical: 6,
+                    borderRadius: 8,
+                    backgroundColor: selectedText && selectedText.fontSize === size ? '#e6f0ff' : '#f5f6fa',
+                    marginHorizontal: 4,
+                  }}
+                  onPress={() => {
+                    setCanvasTexts((prev) => prev.map((txt) => txt.id === selectedText.id ? { ...txt, fontSize: size } : txt));
+                    setShowTextSizePicker(false);
+                  }}
+                >
+                  <Text style={{ fontSize: size, color: '#222' }}>{size}</Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+            <Button title="Close" onPress={() => setShowTextSizePicker(false)} />
+          </View>
+        </View>
+      </Modal>
+      {/* Font family picker popup */}
+      <Modal visible={showTextFontFamilyPicker} transparent animationType="fade">
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.2)' }}>
+          <View style={{ backgroundColor: '#fff', borderRadius: 16, padding: 20, minWidth: 220 }}>
+            <Text style={{ fontWeight: 'bold', fontSize: 16, marginBottom: 8 }}>Font Family</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ flexDirection: 'row', alignItems: 'center' }}>
+              {FONT_FAMILIES.map((family: string) => (
+                <TouchableOpacity
+                  key={family}
+                  style={{
+                    paddingHorizontal: 10,
+                    paddingVertical: 6,
+                    borderRadius: 8,
+                    backgroundColor: selectedText && selectedText.fontFamily === family ? '#e6f0ff' : '#f5f6fa',
+                    marginHorizontal: 4,
+                  }}
+                  onPress={() => {
+                    setCanvasTexts((prev) => prev.map((txt) => txt.id === selectedText.id ? { ...txt, fontFamily: family } : txt));
+                    setShowTextFontFamilyPicker(false);
+                  }}
+                >
+                  <Text style={{ fontFamily: family, fontSize: 16, color: '#222' }}>{family}</Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+            <Button title="Close" onPress={() => setShowTextFontFamilyPicker(false)} />
+          </View>
+        </View>
+      </Modal>
+      {/* Color picker modal for canvas background */}
+      <Modal visible={showCanvasColorPicker} transparent animationType="fade">
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.2)' }}>
+          <View style={{ backgroundColor: '#fff', borderRadius: 16, padding: 20, width: 320, maxWidth: '90%' }}>
+            <Text style={{ fontWeight: 'bold', fontSize: 16, marginBottom: 8 }}>Canvas Background Color</Text>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={true}
+              contentContainerStyle={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 8 }}
+              style={{ maxWidth: 300 }}
+            >
+              {COLOR_PALETTE.map((color: string) => (
+                <TouchableOpacity
+                  key={color}
+                  style={{
+                    width: 32,
+                    height: 32,
+                    borderRadius: 16,
+                    marginHorizontal: 4,
+                    backgroundColor: color,
+                    borderWidth: canvasBgColor === color ? 3 : 2,
+                    borderColor: canvasBgColor === color ? '#3478f6' : '#eee',
+                  }}
+                  onPress={() => { setCanvasBgColor(color); setShowCanvasColorPicker(false); }}
+                />
+              ))}
+            </ScrollView>
+            <Button title="Close" onPress={() => setShowCanvasColorPicker(false)} />
+          </View>
+        </View>
+      </Modal>
+      {/* Note modal */}
+      <Modal visible={showNoteModal} transparent animationType="fade">
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.2)' }}>
+          <View style={{ backgroundColor: '#fff', borderRadius: 16, padding: 20, minWidth: 260 }}>
+            <Text style={{ fontWeight: 'bold', fontSize: 16, marginBottom: 8 }}>Add Note</Text>
+            <TextInput
+              value={canvasNote}
+              onChangeText={setCanvasNote}
+              placeholder="Enter a short note..."
+              style={{ borderWidth: 1, borderColor: '#ccc', borderRadius: 8, padding: 8, minHeight: 60, marginBottom: 12 }}
+              multiline
+            />
+            <View style={{ flexDirection: 'row', justifyContent: 'flex-end' }}>
+              <Button title="Cancel" onPress={() => setShowNoteModal(false)} />
+              <View style={{ width: 12 }} />
+              <Button title="Save" onPress={() => setShowNoteModal(false)} />
+            </View>
+          </View>
+        </View>
+      </Modal>
+    </View>
+  );
+}
+
+const Toolbox = ({ visible, onToolPress, toolsOpen }: { visible: boolean; onToolPress: (tool: string) => void; toolsOpen: boolean }) => {
+  if (!visible) return null;
+  return (
+    <View style={styles.toolbox}>
+      <ToolboxItem icon="text" label="Text" onPress={() => onToolPress('Text')} />
+      <ToolboxItem icon="image-outline" label="Images" onPress={() => onToolPress('Images')} />
+      <ToolboxItem icon="construct-outline" label="Tools" onPress={() => onToolPress('Tools')} selected={toolsOpen} />
+    </View>
+  );
+};
+
+const ToolboxItem = ({ icon, label, onPress, selected }: { icon: IoniconsName; label: string; onPress: () => void; selected?: boolean }) => (
+  <TouchableOpacity style={[styles.toolboxItem, selected && styles.toolboxItemSelected]} onPress={onPress}>
+    <Ionicons name={icon} size={28} color={selected ? '#3478f6' : '#222'} />
+    <Text style={[styles.toolboxLabel, selected && { color: '#3478f6' }]}>{label}</Text>
+  </TouchableOpacity>
+);
+
+const ToolsToolbox = ({ onToolPress, activeTool }: { onToolPress: (tool: string) => void; activeTool: string | null }) => (
+  <View style={styles.toolsToolbox}>
+    <ToolsToolboxItem icon="hand-left-outline" label="Select" color="#4B0082" onPress={() => onToolPress('Select')} selected={activeTool === 'Select'} />
+    <ToolsToolboxItem icon="pencil-outline" label="Draw" color="#FFD600" onPress={() => onToolPress('Draw')} selected={activeTool === 'Draw'} />
+    <ToolsToolboxItem icon="ellipse-outline" label="Shapes" color="#000" onPress={() => onToolPress('Shapes')} selected={activeTool === 'Shapes'} />
+    <ToolsToolboxItem icon="document-text-outline" label="Notes" color="#4B0082" onPress={() => onToolPress('Notes')} selected={activeTool === 'Notes'} />
+    <ToolsToolboxItem icon="grid-outline" label="Table" color="#1976D2" onPress={() => onToolPress('Table')} selected={activeTool === 'Table'} />
+  </View>
+);
+
+const ToolsToolboxItem = ({ icon, label, color, onPress, selected }: { icon: IoniconsName; label: string; color: string; onPress: () => void; selected?: boolean }) => (
+  <TouchableOpacity style={[styles.toolsToolboxItem, selected && styles.toolsToolboxItemSelected]} onPress={onPress}>
+    <Ionicons name={icon} size={26} color={color} />
+    <Text style={[styles.toolsToolboxLabel, selected && { color }]}>{label}</Text>
+  </TouchableOpacity>
+);
+
+const ShapePicker = ({ onSelect, onClose }: { onSelect: (shapeType: string) => void; onClose: () => void }) => (
+  <View style={styles.shapePickerOverlay}>
+    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.shapePickerScroll}>
+      {SHAPE_OPTIONS.map((shape) => (
+        <TouchableOpacity
+          key={shape.type}
+          style={styles.shapePickerItem}
+          onPress={() => onSelect(shape.type)}
+        >
+          <Ionicons name={shape.icon as IoniconsName} size={36} color="#1976D2" />
+        </TouchableOpacity>
+      ))}
+      <TouchableOpacity style={styles.shapePickerClose} onPress={onClose}>
+        <Ionicons name="close" size={32} color="#888" />
+      </TouchableOpacity>
+    </ScrollView>
+  </View>
+);
+
+const ShapeOnCanvas = ({ shape, selected, onPress, draggable, updatePosition, canvasLayout, updateSize }: {
+  shape: any;
+  selected?: boolean;
+  onPress?: (e?: GestureResponderEvent) => void;
+  draggable?: boolean;
+  updatePosition?: (x: number, y: number) => void;
+  canvasLayout?: { x: number; y: number; width: number; height: number };
+  updateSize?: (id: number, newSize: number, newX: number, newY: number) => void;
+}) => {
+  // Debug log for selection
+  console.log('ShapeOnCanvas', shape.id, 'selected:', selected);
+  const pan = React.useRef(new Animated.ValueXY({ x: shape.x, y: shape.y })).current;
+  const panOffset = React.useRef({ x: shape.x, y: shape.y });
+
+  React.useEffect(() => {
+    pan.setValue({ x: shape.x, y: shape.y });
+    panOffset.current = { x: shape.x, y: shape.y };
+  }, [shape.x, shape.y]);
+
+  // Tap-to-select logic
+  const handleTap = (e: GestureResponderEvent) => {
+    if (e && e.stopPropagation) e.stopPropagation();
+    if (!selected && onPress) {
+      onPress(e);
+    }
+  };
+
+  const panResponder = React.useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: (evt, gestureState) => {
+        if (onPress) {
+          onPress(evt);
+        }
+        return !!selected;
+      },
+      onPanResponderGrant: (evt, gestureState) => {
+        if (!selected && onPress) {
+          if (evt && evt.stopPropagation) evt.stopPropagation();
+          onPress(evt);
+        }
+        // @ts-ignore
+        const { x, y } = pan.__getValue();
+        panOffset.current = { x, y };
+      },
+      onPanResponderMove: (e, gesture) => {
+        if (!canvasLayout || !selected) return;
+        let newX = gesture.dx + panOffset.current.x;
+        let newY = gesture.dy + panOffset.current.y;
+        // Constrain within canvas
+        newX = Math.max(0, Math.min(newX, canvasLayout.width - (shape.size || 36)));
+        newY = Math.max(0, Math.min(newY, canvasLayout.height - (shape.size || 36)));
+        pan.setValue({ x: newX, y: newY });
+      },
+      onPanResponderRelease: (e, gesture) => {
+        if (!canvasLayout || !selected) return;
+        // @ts-ignore
+        const { x, y } = pan.__getValue();
+        let newX = x;
+        let newY = y;
+        // Constrain within canvas
+        newX = Math.max(0, Math.min(newX, canvasLayout.width - (shape.size || 36)));
+        newY = Math.max(0, Math.min(newY, canvasLayout.height - (shape.size || 36)));
+        pan.setValue({ x: newX, y: newY });
+        panOffset.current = { x: newX, y: newY };
+        updatePosition && updatePosition(newX, newY);
+      },
+    })
+  ).current;
+
+  // Resize logic (for all shapes)
+  const handleResize = (handle: string, dx: number, dy: number) => {
+    if (!selected || !updateSize || !canvasLayout) return;
+    let { x, y, size } = shape;
+    
+    // Get current dimensions based on shape type
+    let w, h;
+    if (shape.type === 'rectangle') {
+      w = size;
+      h = size * 0.7;
+    } else if (shape.type === 'line') {
+      w = size;
+      h = 20;
+    } else {
+      // For circle, triangle, and icon shapes
+      w = size;
+      h = size;
+    }
+    
+    let newX = x, newY = y, newW = w, newH = h;
+    
+    // Debug log
+    console.log('handleResize', handle, dx, dy, { x, y, w, h, shapeType: shape.type });
+    
+    // Handle logic for each handle
+    switch (handle) {
+      case 'topLeft':
+        newX = x + dx;
+        newY = y + dy;
+        newW = w - dx;
+        newH = h - dy;
+        break;
+      case 'top':
+        newY = y + dy;
+        newH = h - dy;
+        break;
+      case 'topRight':
+        newY = y + dy;
+        newW = w + dx;
+        newH = h - dy;
+        break;
+      case 'right':
+        newW = w + dx;
+        break;
+      case 'bottomRight':
+        newW = w + dx;
+        newH = h + dy;
+        break;
+      case 'bottom':
+        newH = h + dy;
+        break;
+      case 'bottomLeft':
+        newX = x + dx;
+        newW = w - dx;
+        newH = h + dy;
+        break;
+      case 'left':
+        newX = x + dx;
+        newW = w - dx;
+        break;
+    }
+    
+    // Constrain
+    newW = Math.max(MIN_SHAPE_SIZE, Math.min(newW, canvasLayout.width - newX));
+    newH = Math.max(MIN_SHAPE_SIZE, Math.min(newH, canvasLayout.height - newY));
+    newX = Math.max(0, Math.min(newX, canvasLayout.width - newW));
+    newY = Math.max(0, Math.min(newY, canvasLayout.height - newH));
+    
+    // Update size based on shape type
+    if (shape.type === 'circle') {
+      // For circles, keep it square
+      const newSize = Math.max(newW, newH);
+      updateSize(shape.id, newSize, newX, newY);
+    } else if (shape.type === 'line') {
+      // For lines, use width as size
+      updateSize(shape.id, newW, newX, newY);
+    } else {
+      // For rectangles, triangles, and icon shapes, use width as size
+      updateSize(shape.id, newW, newX, newY);
+    }
+  };
+
+  // Rectangle
+  if (shape.type === 'rectangle') {
+    return (
+      <Animated.View
+        {...panResponder.panHandlers}
+        style={[
+          styles.shapeRect,
+          {
+            width: shape.size,
+            height: shape.size * 0.7,
+            backgroundColor: shape.color || 'transparent',
+            position: 'absolute',
+            borderWidth: selected ? 2 : 2,
+            borderColor: selected ? '#7c3aed' : '#bbb',
+            zIndex: selected ? 2 : 1,
+            transform: pan.getTranslateTransform(),
+          },
+        ]}
+      >
+        {selected && Object.entries(getHandlePositions(shape)).map(([handle, pos]) => (
+          <ResizeHandle
+            key={handle}
+            x={pos.x}
+            y={pos.y}
+            onResize={(dx: number, dy: number) => handleResize(handle, dx, dy)}
+            type={['topLeft','topRight','bottomLeft','bottomRight'].includes(handle) ? 'corner' : 'side'}
+          />
+        ))}
+      </Animated.View>
+    );
+  }
+  // Circle
+  if (shape.type === 'circle') {
+    return (
+      <Animated.View
+        {...panResponder.panHandlers}
+        style={[
+          styles.shapeCircle,
+          {
+            width: shape.size,
+            height: shape.size,
+            backgroundColor: shape.color || 'transparent',
+            borderRadius: shape.size / 2,
+            position: 'absolute',
+            borderWidth: selected ? 2 : 2,
+            borderColor: selected ? '#7c3aed' : '#bbb',
+            zIndex: selected ? 2 : 1,
+            transform: pan.getTranslateTransform(),
+          },
+        ]}
+      >
+        {selected && Object.entries(getHandlePositions(shape)).map(([handle, pos]) => (
+          <ResizeHandle
+            key={handle}
+            x={pos.x}
+            y={pos.y}
+            onResize={(dx: number, dy: number) => handleResize(handle, dx, dy)}
+            type={['topLeft','topRight','bottomLeft','bottomRight'].includes(handle) ? 'corner' : 'side'}
+          />
+        ))}
+      </Animated.View>
+    );
+  }
+  // Triangle
+  if (shape.type === 'triangle') {
+    return (
+      <Animated.View
+        {...panResponder.panHandlers}
+        style={{
+          position: 'absolute',
+          zIndex: selected ? 2 : 1,
+          borderWidth: selected ? 2 : 0,
+          borderColor: selected ? '#7c3aed' : 'transparent',
+          borderRadius: 8,
+          backgroundColor: selected ? '#e6f0ff' : 'transparent',
+          transform: pan.getTranslateTransform(),
+        }}
+      >
+        <View
+          style={[
+            {
+              width: shape.size,
+              height: shape.size,
+              justifyContent: 'center',
+              alignItems: 'center',
+            },
+          ]}
+      >
+        <View
+          style={[
+            {
+              width: 0,
+              height: 0,
+              borderLeftWidth: shape.size / 2,
+              borderRightWidth: shape.size / 2,
+                borderBottomWidth: shape.size * 0.866, // Equilateral triangle height
+              borderLeftColor: 'transparent',
+              borderRightColor: 'transparent',
+              borderBottomColor: selected ? '#3478f6' : '#bbb',
+            },
+            selected && {
+              shadowColor: '#3478f6',
+              shadowOffset: { width: 0, height: 0 },
+              shadowOpacity: 0.7,
+              shadowRadius: 6,
+              elevation: 4,
+            },
+          ]}
+        />
+        </View>
+        {selected && Object.entries(getHandlePositions(shape)).map(([handle, pos]) => (
+          <ResizeHandle
+            key={handle}
+            x={pos.x}
+            y={pos.y}
+            onResize={(dx: number, dy: number) => handleResize(handle, dx, dy)}
+            type={['topLeft','topRight','bottomLeft','bottomRight'].includes(handle) ? 'corner' : 'side'}
+          />
+        ))}
+      </Animated.View>
+    );
+  }
+  // Line
+  if (shape.type === 'line') {
+    return (
+      <Animated.View
+        {...panResponder.panHandlers}
+        style={{
+          position: 'absolute',
+          zIndex: selected ? 2 : 1,
+          borderWidth: selected ? 2 : 0,
+          borderColor: selected ? '#7c3aed' : 'transparent',
+          borderRadius: 8,
+          backgroundColor: selected ? '#e6f0ff' : 'transparent',
+          transform: pan.getTranslateTransform(),
+        }}
+      >
+        <View
+          style={[
+            {
+              width: shape.size,
+              height: 20,
+              justifyContent: 'center',
+              alignItems: 'center',
+            },
+          ]}
+        >
+          <View
+        style={[{
+          width: shape.size,
+          height: 4,
+          backgroundColor: selected ? '#3478f6' : '#bbb',
+          borderRadius: 2,
+        }]}
+      />
+        </View>
+        {selected && Object.entries(getHandlePositions(shape)).map(([handle, pos]) => (
+          <ResizeHandle
+            key={handle}
+            x={pos.x}
+            y={pos.y}
+            onResize={(dx: number, dy: number) => handleResize(handle, dx, dy)}
+            type={['topLeft','topRight','bottomLeft','bottomRight'].includes(handle) ? 'corner' : 'side'}
+          />
+        ))}
+      </Animated.View>
+    );
+  }
+  // Icon-based shapes
+  if ([
+    'star', 'heart', 'arrow', 'pentagon', 'diamond', 'cloud',
+  ].includes(shape.type)) {
+    const iconMap: Record<string, IoniconsName> = {
+      star: 'star-outline',
+      heart: 'heart-outline',
+      arrow: 'arrow-forward-outline',
+      pentagon: 'shapes-outline',
+      diamond: 'shapes-outline',
+      cloud: 'cloud-outline',
+    };
+    return (
+      <Animated.View
+        {...panResponder.panHandlers}
+        style={{
+          position: 'absolute',
+          zIndex: selected ? 2 : 1,
+          borderWidth: selected ? 2 : 0,
+          borderColor: selected ? '#7c3aed' : 'transparent',
+          borderRadius: 16,
+          backgroundColor: selected ? '#e6f0ff' : 'transparent',
+          transform: pan.getTranslateTransform(),
+        }}
+      >
+        <View
+          style={[
+            {
+              width: shape.size,
+              height: shape.size,
+              justifyContent: 'center',
+              alignItems: 'center',
+            },
+          ]}
+      >
+        <Ionicons
+          name={iconMap[shape.type]}
+            size={Math.min(36, shape.size * 0.6)}
+          color={shape.color || (selected ? '#3478f6' : '#bbb')}
+        />
+        </View>
+        {selected && Object.entries(getHandlePositions(shape)).map(([handle, pos]) => (
+          <ResizeHandle
+            key={handle}
+            x={pos.x}
+            y={pos.y}
+            onResize={(dx: number, dy: number) => handleResize(handle, dx, dy)}
+            type={['topLeft','topRight','bottomLeft','bottomRight'].includes(handle) ? 'corner' : 'side'}
+          />
+        ))}
+      </Animated.View>
+    );
+  }
+  return null;
+};
+
+const CanvasOptions = ({ onClose, onDeleteAll, onColor, onAnimate, onNote }: { onClose: () => void; onDeleteAll: () => void; onColor: () => void; onAnimate: () => void; onNote: () => void }) => (
+  <View style={styles.optionsOverlay}>
+    <View style={styles.optionsRow}>
+      <TouchableOpacity onPress={onColor} style={styles.optionItem}>
+        <Ionicons name="color-palette-outline" size={26} color="#222" />
+        <Text style={styles.optionLabel}>Color</Text>
+      </TouchableOpacity>
+      <TouchableOpacity onPress={onAnimate} style={styles.optionItem}>
+        <Ionicons name="sparkles-outline" size={26} color="#222" />
+        <Text style={styles.optionLabel}>Animate</Text>
+      </TouchableOpacity>
+      <TouchableOpacity onPress={onNote} style={styles.optionItem}>
+        <Ionicons name="document-text-outline" size={26} color="#222" />
+        <Text style={styles.optionLabel}>Notes</Text>
+      </TouchableOpacity>
+      <TouchableOpacity onPress={onDeleteAll} style={styles.closeBtn}>
+        <Ionicons name="trash-outline" size={28} color="#e74c3c" />
+      </TouchableOpacity>
+      <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
+        <Ionicons name="close" size={28} color="#222" />
+      </TouchableOpacity>
+    </View>
+  </View>
+);
+
+const OptionItem = ({ icon, label }: { icon: IoniconsName; label: string }) => (
+  <View style={styles.optionItem}>
+    <Ionicons name={icon} size={26} color="#222" />
+    <Text style={styles.optionLabel}>{label}</Text>
+  </View>
+);
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F5F5F5',
+    backgroundColor: '#F5F6FA',
+    justifyContent: 'flex-end',
   },
-  headerBar: {
+  centeredContent: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  canvas: {
+    width: CANVAS_SIZE,
+    height: CANVAS_SIZE * 1.15,
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  canvasFocused: {
+    borderWidth: 2,
+    borderColor: '#3478f6',
+  },
+  toolboxContainer: {
+    width: '100%',
+    alignItems: 'center',
+    marginBottom: 48,
+    position: 'relative',
+  },
+  toolbox: {
+    flexDirection: 'row',
+    backgroundColor: '#F5F6FA',
+    borderRadius: 24,
+    paddingVertical: 10,
+    paddingHorizontal: 24,
+    justifyContent: 'space-between',
+    width: '90%',
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.04,
+    shadowRadius: 4,
+  },
+  toolboxItem: {
+    alignItems: 'center',
+    flex: 1,
+    paddingVertical: 2,
+  },
+  toolboxItemSelected: {
+    backgroundColor: '#e6f0ff',
+    borderRadius: 12,
+  },
+  toolboxLabel: {
+    fontSize: 12,
+    color: '#222',
+    marginTop: 2,
+    fontFamily: 'System',
+  },
+  optionsOverlay: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: '#fff',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    paddingVertical: 16,
+    paddingHorizontal: 24,
+    elevation: 6,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+  },
+  optionsRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: '#F4F4FF',
-    paddingTop: 24,
-    paddingBottom: 12,
-    width: '100%',
-    paddingHorizontal: 10,
   },
-  topToolbar: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
+  optionItem: {
     alignItems: 'center',
-    paddingVertical: 10,
-    paddingHorizontal: 20,
-    backgroundColor: '#FFFFFF',
-    borderBottomWidth: 1,
-    borderBottomColor: '#E0E0E0',
-  },
-  toolbarButton: {
-    padding: 8,
-    borderRadius: 8,
-  },
-  canvasContainer: {
     flex: 1,
-    margin: 10,
-    borderRadius: 8,
-    overflow: 'hidden',
   },
-  canvas: {
-    width: CANVAS_WIDTH,
-    height: CANVAS_HEIGHT,
-    borderRadius: 8,
-  },
-  bottomToolbar: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    alignItems: 'center',
-    paddingVertical: 15,
-    paddingHorizontal: 20,
-    backgroundColor: '#FFFFFF',
-    borderTopWidth: 1,
-    borderTopColor: '#E0E0E0',
-  },
-  toolButton: {
-    alignItems: 'center',
-    padding: 8,
-    borderRadius: 8,
-  },
-  activeToolButton: {
-    backgroundColor: '#E3F2FD',
-  },
-  toolLabel: {
+  optionLabel: {
     fontSize: 12,
-    marginTop: 4,
-    color: '#333',
-  },
-  activeToolLabel: {
-    color: '#007AFF',
-    fontWeight: 'bold',
-  },
-  deleteButton: {
-    alignItems: 'center',
-    padding: 8,
-    borderRadius: 8,
-    backgroundColor: '#FFEBEE',
-  },
-  activeToolbarButton: {
-    backgroundColor: '#E3F2FD',
-  },
-  toolbarButtonLabel: {
-    fontSize: 12,
-    marginLeft: 4,
-    color: '#333',
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
     color: '#222',
-    textAlign: 'center',
+    marginTop: 2,
+    fontFamily: 'System',
+  },
+  closeBtn: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 8,
+    flex: 0.5,
+  },
+  toolsToolbox: {
+    flexDirection: 'row',
+    backgroundColor: '#fff',
+    borderRadius: 20,
+    paddingVertical: 10,
+    paddingHorizontal: 18,
+    justifyContent: 'space-between',
+    width: '90%',
+    alignSelf: 'center',
+    marginBottom: 8,
+    elevation: 3,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.06,
+    shadowRadius: 6,
+  },
+  toolsToolboxItem: {
+    alignItems: 'center',
     flex: 1,
+  },
+  toolsToolboxItemSelected: {
+    backgroundColor: '#e6f0ff',
+    borderRadius: 12,
+  },
+  toolsToolboxLabel: {
+    fontSize: 12,
+    color: '#222',
+    marginTop: 2,
+    fontFamily: 'System',
+  },
+  shapePicker: {
+    // old style removed
+  },
+  shapePickerOverlay: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: '#fff',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    paddingVertical: 16,
+    elevation: 8,
+    zIndex: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+  },
+  shapePickerScroll: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 16,
+  },
+  shapePickerItem: {
+    marginHorizontal: 10,
+    padding: 10,
+    borderRadius: 16,
+    backgroundColor: '#f5f6fa',
+    alignItems: 'center',
+  },
+  shapePickerClose: {
+    marginLeft: 18,
+    padding: 10,
+    borderRadius: 16,
+    backgroundColor: '#f5f6fa',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  shapeRect: {
+    borderRadius: 6,
+  },
+  shapeCircle: {},
+  shapeToolbar: {
+    position: 'absolute',
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    padding: 8,
+    elevation: 6,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.12,
+    shadowRadius: 8,
+    zIndex: 20,
+    flexDirection: 'row',
+  },
+  toolbarBtn: {
+    padding: 8,
+    borderRadius: 8,
+    marginHorizontal: 2,
+  },
+  colorPickerPopup: {
+    position: 'absolute',
+    top: 60,
+    left: '50%',
+    transform: [{ translateX: -80 }],
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    padding: 10,
+    flexDirection: 'row',
+    elevation: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.12,
+    shadowRadius: 8,
+    zIndex: 30,
+  },
+  colorPickerScroll: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  colorSwatch: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    marginHorizontal: 6,
+    borderWidth: 2,
+    borderColor: '#eee',
+  },
+  selectedSwatch: {
+    borderColor: '#3478f6',
+    borderWidth: 3,
+  },
+  drawToolbar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fff',
+    borderRadius: 18,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    elevation: 6,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.12,
+    shadowRadius: 8,
+    marginBottom: 8,
+    zIndex: 20,
+  },
+  drawToolBtn: {
+    marginHorizontal: 8,
+    padding: 8,
+    borderRadius: 12,
+    backgroundColor: '#f5f6fa',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  drawToolBtnSelected: {
+    backgroundColor: '#e6f0ff',
+  },
+  thicknessSelector: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginLeft: 16,
+  },
+  thicknessBtn: {
+    marginHorizontal: 4,
+    padding: 4,
+    borderRadius: 8,
+    backgroundColor: '#f5f6fa',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  thicknessBtnSelected: {
+    backgroundColor: '#dbeafe',
+  },
+  thicknessSliderPopup: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 80,
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    padding: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    elevation: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.12,
+    shadowRadius: 8,
+    zIndex: 30,
+  },
+  thicknessSliderClose: {
+    marginLeft: 16,
+    padding: 8,
+    borderRadius: 16,
+    backgroundColor: '#f5f6fa',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingTop: 36,
+    paddingBottom: 12,
+    paddingHorizontal: 16,
+    backgroundColor: Colors.light.tint,
+    borderBottomWidth: 0,
+    zIndex: 100,
+    elevation: 8,
+  },
+  textToolbar: {
+    position: 'absolute',
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    padding: 8,
+    elevation: 6,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.12,
+    shadowRadius: 8,
+    zIndex: 20,
+    flexDirection: 'row',
+  },
+  imageToolbar: {
+    position: 'absolute',
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    padding: 8,
+    elevation: 6,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.12,
+    shadowRadius: 8,
+    zIndex: 20,
+    flexDirection: 'row',
   },
 });
-
-export default function CanvaDesignPage() {
-  const {
-    elements,
-    selectedElements,
-    canvasBackgroundColor,
-    currentTool,
-    addElement,
-    selectElement,
-    clearSelection,
-    moveElement,
-    resizeElement,
-    deleteSelectedElements,
-    undo,
-    redo,
-    canUndo,
-    canRedo,
-    saveDesign,
-    loadDesign,
-    clearDesign,
-    updateElement,
-    setCurrentTool,
-  } = useDesignStore();
-
-  const [showColorPicker, setShowColorPicker] = useState(false);
-  const [colorPickerTarget, setColorPickerTarget] = useState<'canvas' | 'element' | 'text'>('canvas');
-  const [editingTextId, setEditingTextId] = useState<string | null>(null);
-  const [dragState, setDragState] = useState<DragState>({
-    isDragging: false,
-    startX: 0,
-    startY: 0,
-    elementStartX: 0,
-    elementStartY: 0,
-    elementId: null,
-    dragOffsetX: 0,
-    dragOffsetY: 0,
-  });
-  const [resizeState, setResizeState] = useState<ResizeState>({
-    isResizing: false,
-    handle: null,
-    startX: 0,
-    startY: 0,
-    startWidth: 0,
-    startHeight: 0,
-    elementId: null,
-  });
-  const [showShapePicker, setShowShapePicker] = useState(false);
-  const [activeTab, setActiveTab] = useState<'select' | 'text' | 'images' | 'shapes' | 'background'>('text');
-  
-  const canvasRef = useRef<View>(null);
-  const viewShotRef = useRef<any>(null);
-  const router = useRouter();
-  const params = useLocalSearchParams();
-  const [canvasOffset, setCanvasOffset] = useState({ x: 0, y: 0 });
-  const canvasOffsetRef = useRef({ x: 0, y: 0 });
-  useEffect(() => { canvasOffsetRef.current = canvasOffset; }, [canvasOffset]);
-
-  // Handle template parameter
-  useEffect(() => {
-    if (params.template) {
-      try {
-        const templateData = JSON.parse(params.template as string);
-        console.log('Template data received:', templateData);
-        
-        // Clear existing design
-        clearDesign();
-        
-        // Add template title as text element
-        if (templateData.title) {
-          addElement({
-            id: generateId(),
-            type: 'text',
-            x: CANVAS_WIDTH / 2 - 100,
-            y: 50,
-            width: 200,
-            height: 40,
-            text: templateData.title,
-            fontSize: 24,
-            color: '#000000',
-            fontFamily: 'Arial',
-            selected: false,
-          });
-        }
-        
-        // You can add more template-specific elements here
-        // For example, add a placeholder image or shape based on template type
-        
-      } catch (error) {
-        console.error('Error parsing template data:', error);
-      }
-    }
-  }, [params.template]);
-
-  // For real-time drag
-  const dragPositionRef = useRef<{ x: number; y: number } | null>(null);
-  const [draggedElementId, setDraggedElementId] = useState<string | null>(null);
-  const [, forceUpdate] = useState(0); // Used to force re-render during drag
-
-  // Load design on mount
-  useEffect(() => {
-    // Don't auto-load design - let user choose what to load
-    // loadDesign();
-  }, []);
-
-  // Use onLayout to get the absolute position of the canvas on the screen
-  const handleCanvasLayout = (event: any) => {
-    const { x, y } = event.nativeEvent.layout;
-    // x and y are relative to the parent, but we want absolute position on screen
-    // Use measureInWindow for absolute position
-    if (canvasRef.current && typeof canvasRef.current.measureInWindow === 'function') {
-      // @ts-ignore
-      canvasRef.current.measureInWindow((px, py, width, height) => {
-        setCanvasOffset({ x: px, y: py });
-      });
-    }
-  };
-
-  // Check if a point is within a resize handle
-  const getResizeHandleAtPoint = (x: number, y: number, element: Element): ResizeHandle | null => {
-    const handleSize = 12;
-    const { x: elX, y: elY, width, height } = element;
-    
-    // Check corner handles
-    if (x >= elX - handleSize && x <= elX + handleSize && y >= elY - handleSize && y <= elY + handleSize) {
-      return 'top-left';
-    }
-    if (x >= elX + width - handleSize && x <= elX + width + handleSize && y >= elY - handleSize && y <= elY + handleSize) {
-      return 'top-right';
-    }
-    if (x >= elX - handleSize && x <= elX + handleSize && y >= elY + height - handleSize && y <= elY + height + handleSize) {
-      return 'bottom-left';
-    }
-    if (x >= elX + width - handleSize && x <= elX + width + handleSize && y >= elY + height - handleSize && y <= elY + height + handleSize) {
-      return 'bottom-right';
-    }
-    
-    // Check edge handles
-    if (x >= elX && x <= elX + width && y >= elY - handleSize && y <= elY + handleSize) {
-      return 'top';
-    }
-    if (x >= elX + width - handleSize && x <= elX + width + handleSize && y >= elY && y <= elY + height) {
-      return 'right';
-    }
-    if (x >= elX && x <= elX + width && y >= elY + height - handleSize && y <= elY + height + handleSize) {
-      return 'bottom';
-    }
-    if (x >= elX - handleSize && x <= elX + handleSize && y >= elY && y <= elY + height) {
-      return 'left';
-    }
-    
-    return null;
-  };
-
-  // PanResponder for canvas interactions
-  const panResponder = PanResponder.create({
-    onStartShouldSetPanResponder: () => true,
-    onMoveShouldSetPanResponder: () => true,
-    onPanResponderGrant: (evt) => {
-      const { pageX, pageY } = evt.nativeEvent;
-      if (canvasRef.current && typeof canvasRef.current.measureInWindow === 'function') {
-        // @ts-ignore
-        canvasRef.current.measureInWindow((px, py, width, height) => {
-          // Store in ref for immediate use
-          canvasOffsetRef.current = { x: px, y: py };
-          setCanvasOffset({ x: px, y: py });
-          const localX = pageX - px;
-          const localY = pageY - py;
-          handlePanGrantLogic(localX, localY, pageX, pageY);
-        });
-      } else {
-        // Fallback if measureInWindow is not available
-        const { x, y } = canvasOffsetRef.current;
-        const localX = pageX - x;
-        const localY = pageY - y;
-        handlePanGrantLogic(localX, localY, pageX, pageY);
-      }
-      // Reset drag position ref
-      dragPositionRef.current = null;
-      setDraggedElementId(null);
-    },
-    onPanResponderMove: (evt) => {
-      const { pageX, pageY } = evt.nativeEvent;
-      const { x, y } = canvasOffsetRef.current;
-      const localX = pageX - x;
-      const localY = pageY - y;
-      console.log('[PanResponderMove] pageX:', pageX, 'localX:', localX, 'pageY:', pageY, 'localY:', localY);
-      if (resizeState.isResizing && resizeState.elementId) {
-        handleResize(localX, localY);
-      } else if (dragState.isDragging && dragState.elementId) {
-        // Real-time drag: update dragPositionRef and force re-render
-        const element = elements.find(el => el.id === dragState.elementId);
-        if (!element) return;
-        // Calculate new position directly from finger position and offset
-        const newX = localX - dragState.dragOffsetX;
-        const newY = localY - dragState.dragOffsetY;
-        
-        // Apply bounds checking only at the edges to prevent going off-canvas
-        const width = element.width;
-        const height = element.height;
-        const boundedX = Math.max(0, Math.min(CANVAS_WIDTH - width, newX));
-        const boundedY = Math.max(0, Math.min(CANVAS_HEIGHT - height, newY));
-        
-        dragPositionRef.current = { x: boundedX, y: boundedY };
-        setDraggedElementId(dragState.elementId);
-        // Force immediate re-render for responsive dragging
-        requestAnimationFrame(() => forceUpdate(n => n + 1));
-      }
-    },
-    onPanResponderRelease: () => {
-      // Commit drag position to Zustand
-      if (draggedElementId && dragPositionRef.current) {
-        updateElement(draggedElementId, dragPositionRef.current);
-      }
-      // Clear all drag-related state immediately
-      dragPositionRef.current = null;
-      setDraggedElementId(null);
-      // Force a re-render to stop any ongoing movement
-      forceUpdate(n => n + 1);
-      setDragState({
-        isDragging: false,
-        startX: 0,
-        startY: 0,
-        elementStartX: 0,
-        elementStartY: 0,
-        elementId: null,
-        dragOffsetX: 0,
-        dragOffsetY: 0,
-      });
-      setResizeState({
-        isResizing: false,
-        handle: null,
-        startX: 0,
-        startY: 0,
-        startWidth: 0,
-        startHeight: 0,
-        elementId: null,
-      });
-    },
-  });
-
-  const estimateTextWidth = (text: string, fontSize: number) => (fontSize || 16) * 0.6 * (text?.length || 1);
-
-  const handleDrag = (x: number, y: number) => {
-    if (dragState.elementId) {
-      const element = elements.find(el => el.id === dragState.elementId);
-      if (!element) return;
-      // Use the stored width from the element, don't recalculate during drag
-      const width = element.width;
-      const newX = x - dragState.dragOffsetX;
-      const newY = y - dragState.dragOffsetY;
-      const boundedX = Math.max(0, Math.min(CANVAS_WIDTH - width, newX));
-      const boundedY = Math.max(0, Math.min(CANVAS_HEIGHT - element.height, newY));
-      updateElement(dragState.elementId, { x: boundedX, y: boundedY });
-    }
-  };
-
-  const handleResize = (x: number, y: number) => {
-    if (!resizeState.elementId || !resizeState.handle) return;
-    
-    // Adjust coordinates for canvas container margin
-    const adjustedX = x - 10;
-    const adjustedY = y - 10;
-    
-    const deltaX = adjustedX - (resizeState.startX - 10);
-    const deltaY = adjustedY - (resizeState.startY - 10);
-    
-    let newWidth = resizeState.startWidth;
-    let newHeight = resizeState.startHeight;
-    let newX = 0;
-    let newY = 0;
-    
-    const element = elements.find(el => el.id === resizeState.elementId);
-    if (!element) return;
-    
-    switch (resizeState.handle) {
-      case 'top-left':
-        newWidth = Math.max(10, resizeState.startWidth - deltaX);
-        newHeight = Math.max(10, resizeState.startHeight - deltaY);
-        newX = element.x + deltaX;
-        newY = element.y + deltaY;
-        break;
-      case 'top-right':
-        newWidth = Math.max(10, resizeState.startWidth + deltaX);
-        newHeight = Math.max(10, resizeState.startHeight - deltaY);
-        newY = element.y + deltaY;
-        break;
-      case 'bottom-left':
-        newWidth = Math.max(10, resizeState.startWidth - deltaX);
-        newHeight = Math.max(10, resizeState.startHeight + deltaY);
-        newX = element.x + deltaX;
-        break;
-      case 'bottom-right':
-        newWidth = Math.max(10, resizeState.startWidth + deltaX);
-        newHeight = Math.max(10, resizeState.startHeight + deltaY);
-        break;
-      case 'top':
-        newHeight = Math.max(10, resizeState.startHeight - deltaY);
-        newY = element.y + deltaY;
-        break;
-      case 'right':
-        newWidth = Math.max(10, resizeState.startWidth + deltaX);
-        break;
-      case 'bottom':
-        newHeight = Math.max(10, resizeState.startHeight + deltaY);
-        break;
-      case 'left':
-        newWidth = Math.max(10, resizeState.startWidth - deltaX);
-        newX = element.x + deltaX;
-        break;
-    }
-    
-    // Add bounds checking for resize
-    const boundedX = Math.max(0, Math.min(CANVAS_WIDTH - newWidth, newX));
-    const boundedY = Math.max(0, Math.min(CANVAS_HEIGHT - newHeight, newY));
-    const boundedWidth = Math.min(CANVAS_WIDTH - boundedX, newWidth);
-    const boundedHeight = Math.min(CANVAS_HEIGHT - boundedY, newHeight);
-    
-    // For resize operations, we need to handle bounds differently
-    // If we're not changing position (newX/newY is 0), don't constrain dimensions
-    const finalWidth = newX === 0 ? newWidth : boundedWidth;
-    const finalHeight = newY === 0 ? newHeight : boundedHeight;
-    const finalX = newX === 0 ? element.x : boundedX;
-    const finalY = newY === 0 ? element.y : boundedY;
-    
-    // Update element with new dimensions and position
-    const updates: Partial<Element> = {
-      width: finalWidth,
-      height: finalHeight,
-    };
-    
-    if (newX !== 0) updates.x = finalX;
-    if (newY !== 0) updates.y = finalY;
-    
-    updateElement(resizeState.elementId, updates);
-  };
-
-  const handleCanvasTap = (x: number, y: number) => {
-    // Debug log for tap coordinates
-    console.log('Canvas tap at:', x, y, 'Current tool:', currentTool, 'Active tab:', activeTab);
-    if (currentTool === 'select') {
-      // Check if tapping on an element (including text with bounding box), top-most first
-      const tappedElement = elements.slice().reverse().find(el => {
-        if (el.type === 'text') {
-          const width = estimateTextWidth(el.text, el.fontSize);
-          const height = el.fontSize || 16;
-          return x >= el.x - TEXT_SELECTION_PADDING && x <= el.x + width + TEXT_SELECTION_PADDING && y >= el.y - TEXT_SELECTION_PADDING && y <= el.y + height + TEXT_SELECTION_PADDING;
-        }
-        return x >= el.x - SELECTION_PADDING && x <= el.x + el.width + SELECTION_PADDING && y >= el.y - SELECTION_PADDING && y <= el.y + el.height + SELECTION_PADDING;
-      });
-      console.log('Tapped element:', tappedElement);
-      if (tappedElement) {
-        selectElement(tappedElement.id, false);
-      } else {
-        clearSelection();
-      }
-    } else if (currentTool === 'rectangle' || currentTool === 'circle' || currentTool === 'ellipse' || currentTool === 'triangle' || currentTool === 'star' || currentTool === 'line') {
-      // Add shape at tap location
-      let newShape: Shape;
-      if (currentTool === 'rectangle') {
-        newShape = {
-          id: generateId(),
-          type: 'rectangle',
-          x: x - 50,
-          y: y - 25,
-          width: 100,
-          height: 50,
-          backgroundColor: '#FF6B6B',
-          selected: true,
-        };
-      } else if (currentTool === 'circle') {
-        newShape = {
-          id: generateId(),
-          type: 'circle',
-          x: x - 25,
-          y: y - 25,
-          width: 50,
-          height: 50,
-          backgroundColor: '#4ECDC4',
-          selected: true,
-        };
-      } else if (currentTool === 'ellipse') {
-        newShape = {
-          id: generateId(),
-          type: 'ellipse',
-          x: x - 40,
-          y: y - 20,
-          width: 80,
-          height: 40,
-          backgroundColor: '#FFD166',
-          selected: true,
-        };
-      } else if (currentTool === 'triangle') {
-        newShape = {
-          id: generateId(),
-          type: 'triangle',
-          x: x - 40,
-          y: y - 35,
-          width: 80,
-          height: 70,
-          backgroundColor: '#118AB2',
-          selected: true,
-        };
-      } else if (currentTool === 'star') {
-        newShape = {
-          id: generateId(),
-          type: 'star',
-          x: x - 40,
-          y: y - 35,
-          width: 80,
-          height: 70,
-          backgroundColor: '#EF476F',
-          selected: true,
-        };
-      } else if (currentTool === 'line') {
-        newShape = {
-          id: generateId(),
-          type: 'line',
-          x: x,
-          y: y,
-          width: 80,
-          height: 0,
-          backgroundColor: '#073B4C',
-          selected: true,
-        };
-      }
-      addElement(newShape!);
-      setActiveTab('select');
-      setCurrentTool('select');
-    }
-  };
-
-  const handleCanvasDrag = (x: number, y: number) => {
-    // Handle dragging for selected elements
-    if (selectedElements.length > 0 && currentTool === 'select') {
-      // This would need more sophisticated drag handling
-      // For now, we'll implement basic movement
-    }
-  };
-
-  // Double-tap detection for text editing
-  const lastTapRef = useRef<{ id: string; time: number } | null>(null);
-
-  const handleTextTap = (id: string) => {
-    const now = Date.now();
-    // Always select immediately for responsive selection
-    selectElement(id, false);
-    
-    // Check for double-tap
-    if (lastTapRef.current && lastTapRef.current.id === id && now - lastTapRef.current.time < 350) {
-      // Double-tap detected - open text editor
-      setEditingTextId(id);
-      setActiveTab('select');
-      setCurrentTool('select');
-      lastTapRef.current = null;
-    } else {
-      // Single tap - set up for potential double-tap
-      lastTapRef.current = { id, time: now };
-    }
-  };
-
-  const handleImagePicker = async () => {
-    try {
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        allowsEditing: true,
-        aspect: [4, 3],
-        quality: 1,
-      });
-
-      if (!result.canceled && result.assets[0] && result.assets[0].uri) {
-        const newImage: ImageElement = {
-          id: generateId(),
-          type: 'image',
-          x: 100,
-          y: 100,
-          width: 200,
-          height: 150,
-          uri: result.assets[0].uri,
-          selected: true,
-        };
-        addElement(newImage);
-      }
-    } catch (error) {
-      Alert.alert('Error', 'Failed to pick image');
-    }
-  };
-
-  const handleInsertImageIntoShape = async () => {
-    if (selectedElements.length === 0) {
-      Alert.alert('No shape selected', 'Please select a shape to insert an image into.');
-      return;
-    }
-
-    const selectedElement = elements.find(el => el.id === selectedElements[0]);
-    if (!selectedElement || !(selectedElement.type === 'rectangle' || selectedElement.type === 'circle' || selectedElement.type === 'ellipse' || selectedElement.type === 'triangle' || selectedElement.type === 'star')) {
-      Alert.alert('Invalid selection', 'Please select a shape to insert an image into.');
-      return;
-    }
-
-    try {
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        allowsEditing: true,
-        aspect: [selectedElement.width, selectedElement.height],
-        quality: 1,
-      });
-
-      if (!result.canceled && result.assets[0] && result.assets[0].uri) {
-        const newImage: ImageElement = {
-          id: generateId(),
-          type: 'image',
-          x: selectedElement.x,
-          y: selectedElement.y,
-          width: selectedElement.width,
-          height: selectedElement.height,
-          uri: result.assets[0].uri,
-          selected: true,
-        };
-        addElement(newImage);
-        // Clear the shape selection and select the new image
-        clearSelection();
-        selectElement(newImage.id, false);
-      }
-    } catch (error) {
-      Alert.alert('Error', 'Failed to pick image');
-    }
-  };
-
-  const handleExport = async () => {
-    try {
-      if (viewShotRef.current && typeof viewShotRef.current.capture === 'function') {
-        const uri = await viewShotRef.current.capture();
-        Alert.alert('Success', `Design exported to: ${uri}`);
-      } else {
-        Alert.alert('Error', 'Export functionality not available');
-      }
-    } catch (error) {
-      Alert.alert('Error', 'Failed to export design');
-    }
-  };
-
-  const handleSaveDesign = async () => {
-    try {
-      const designId = generateId();
-      await saveDesign(designId);
-      
-      // Add to recent designs
-      const { addDesign } = useDesigns();
-      addDesign({
-        label: `Design ${new Date().toLocaleDateString()}`,
-        image: 'https://placehold.co/120x90/eee/000?text=Design',
-        isCompleted: true,
-      });
-      
-      Alert.alert('Success', 'Design saved successfully!');
-    } catch (error) {
-      Alert.alert('Error', 'Failed to save design');
-    }
-  };
-
-  const renderElement = (element: Element) => {
-    let x = element.x;
-    let y = element.y;
-    if (element.id === draggedElementId && dragPositionRef.current && dragState.isDragging) {
-      x = dragPositionRef.current.x;
-      y = dragPositionRef.current.y;
-    }
-    const isSelected = selectedElements.includes(element.id);
-
-    switch (element.type) {
-      case 'rectangle':
-        return (
-          <Rect
-            key={element.id}
-            x={x}
-            y={y}
-            width={element.width}
-            height={element.height}
-            fill={element.backgroundColor}
-            stroke={isSelected ? '#007AFF' : 'none'}
-            strokeWidth={isSelected ? 2 : 0}
-            onPress={() => selectElement(element.id, false)}
-          />
-        );
-      case 'circle':
-        return (
-          <Circle
-            key={element.id}
-            cx={x + element.width / 2}
-            cy={y + element.height / 2}
-            r={element.width / 2}
-            fill={element.backgroundColor}
-            stroke={isSelected ? '#007AFF' : 'none'}
-            strokeWidth={isSelected ? 2 : 0}
-            onPress={() => selectElement(element.id, false)}
-          />
-        );
-      case 'text':
-        return (
-          <SvgText
-            key={element.id}
-            x={x}
-            y={y + element.fontSize}
-            fontSize={element.fontSize}
-            fontFamily={element.fontFamily}
-            fill={element.color}
-            stroke={isSelected ? '#007AFF' : 'none'}
-            strokeWidth={isSelected ? 1 : 0}
-            onPress={() => handleTextTap(element.id)}
-          >
-            {element.text}
-          </SvgText>
-        );
-      case 'image':
-        if (!element.uri) {
-          console.warn('Skipping image with empty uri', element);
-          return null;
-        }
-        return (
-          <SvgImage
-            key={element.id}
-            x={x}
-            y={y}
-            width={element.width}
-            height={element.height}
-            href={{ uri: element.uri }}
-            stroke={isSelected ? '#007AFF' : 'none'}
-            strokeWidth={isSelected ? 2 : 0}
-            onPress={() => selectElement(element.id, false)}
-          />
-        );
-      case 'ellipse':
-        return (
-          <Ellipse
-            key={element.id}
-            cx={x + element.width / 2}
-            cy={y + element.height / 2}
-            rx={element.width / 2}
-            ry={element.height / 2}
-            fill={element.backgroundColor}
-            stroke={isSelected ? '#007AFF' : 'none'}
-            strokeWidth={isSelected ? 2 : 0}
-            onPress={() => selectElement(element.id, false)}
-          />
-        );
-      case 'triangle':
-        return (
-          <Polygon
-            key={element.id}
-            points={`${x},${y} ${x + element.width / 2},${y + element.height} ${x + element.width},${y}`}
-            fill={element.backgroundColor}
-            stroke={isSelected ? '#007AFF' : 'none'}
-            strokeWidth={isSelected ? 2 : 0}
-            onPress={() => selectElement(element.id, false)}
-          />
-        );
-      case 'line':
-        return (
-          <Line
-            key={element.id}
-            x1={x}
-            y1={y}
-            x2={x + element.width}
-            y2={y + element.height}
-            stroke={element.backgroundColor}
-            strokeWidth={isSelected ? 2 : 0}
-            onPress={() => selectElement(element.id, false)}
-          />
-        );
-      case 'star':
-        return (
-          <Polygon
-            key={element.id}
-            points={`${x + element.width / 2},${y} ${x + element.width * 0.16},${y + element.height * 0.16} ${x + element.width * 0.5},${y + element.height * 0.5} ${x + element.width * 0.84},${y + element.height * 0.16} ${x},${y}`}
-            fill={element.backgroundColor}
-            stroke={isSelected ? '#007AFF' : 'none'}
-            strokeWidth={isSelected ? 2 : 0}
-            onPress={() => selectElement(element.id, false)}
-          />
-        );
-      default:
-        return null;
-    }
-  };
-
-  // Render resize handles for selected elements
-  const renderResizeHandles = (element: Element) => {
-    if (!selectedElements.includes(element.id)) return null;
-    const handleSize = 6;
-    let x = element.x, y = element.y, width = element.width, height = element.height;
-    if (element.id === draggedElementId && dragPositionRef.current) {
-      x = dragPositionRef.current.x;
-      y = dragPositionRef.current.y;
-    }
-    if (element.type === 'text') {
-      height = element.fontSize;
-      width = (element.fontSize || 16) * 0.6 * (element.text?.length || 1);
-    }
-    return (
-      <>
-        {/* Corner handles */}
-        <Rect key={`${element.id}-tl`} x={x - handleSize} y={y - handleSize} width={handleSize * 2} height={handleSize * 2} fill="#007AFF" />
-        <Rect key={`${element.id}-tr`} x={x + width - handleSize} y={y - handleSize} width={handleSize * 2} height={handleSize * 2} fill="#007AFF" />
-        <Rect key={`${element.id}-bl`} x={x - handleSize} y={y + height - handleSize} width={handleSize * 2} height={handleSize * 2} fill="#007AFF" />
-        <Rect key={`${element.id}-br`} x={x + width - handleSize} y={y + height - handleSize} width={handleSize * 2} height={handleSize * 2} fill="#007AFF" />
-        {/* Edge handles */}
-        <Rect key={`${element.id}-t`} x={x + width / 2 - handleSize} y={y - handleSize} width={handleSize * 2} height={handleSize * 2} fill="#007AFF" />
-        <Rect key={`${element.id}-r`} x={x + width - handleSize} y={y + height / 2 - handleSize} width={handleSize * 2} height={handleSize * 2} fill="#007AFF" />
-        <Rect key={`${element.id}-b`} x={x + width / 2 - handleSize} y={y + height - handleSize} width={handleSize * 2} height={handleSize * 2} fill="#007AFF" />
-        <Rect key={`${element.id}-l`} x={x - handleSize} y={y + height / 2 - handleSize} width={handleSize * 2} height={handleSize * 2} fill="#007AFF" />
-      </>
-    );
-  };
-
-  const ToolButton = ({ tool, icon, label }: { tool: Tool; icon: string; label: string }) => (
-    <TouchableOpacity
-      style={[styles.toolButton, currentTool === tool && styles.activeToolButton]}
-      onPress={() => useDesignStore.getState().setCurrentTool(tool)}
-    >
-      <Ionicons name={icon as any} size={24} color={currentTool === tool ? '#007AFF' : '#333'} />
-      <Text style={[styles.toolLabel, currentTool === tool && styles.activeToolLabel]}>{label}</Text>
-    </TouchableOpacity>
-  );
-
-  const updateTextElementWidth = (id: string, text: string, fontSize: number) => {
-    const width = estimateTextWidth(text, fontSize);
-    updateElement(id, { width });
-  };
-
-  // Extracted logic for pan grant
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const handlePanGrantLogic = (localX: number, localY: number, pageX: number, pageY: number) => {
-    console.log('PanResponder grant at:', pageX, pageY, 'Local:', localX, localY, 'Current tool:', currentTool, 'Selected elements:', selectedElements);
-    if (currentTool === 'select' && selectedElements.length > 0) {
-      // Check if we're clicking on a resize handle
-      for (const elementId of selectedElements) {
-        const element = elements.find(el => el.id === elementId);
-        if (element) {
-          const handle = getResizeHandleAtPoint(localX, localY, element);
-          if (handle) {
-            setResizeState({
-              isResizing: true,
-              handle,
-              startX: localX,
-              startY: localY,
-              startWidth: element.width,
-              startHeight: element.height,
-              elementId,
-            });
-            console.log('Resize started for element:', elementId, 'Handle:', handle);
-            return;
-          }
-        }
-      }
-      // Check if we're clicking on a selected element for dragging
-      for (const elementId of selectedElements) {
-        const element = elements.find(el => el.id === elementId);
-        if (element && 
-          localX >= element.x - SELECTION_PADDING && localX <= element.x + element.width + SELECTION_PADDING &&
-          localY >= element.y - SELECTION_PADDING && localY <= element.y + element.height + SELECTION_PADDING) {
-          setDragState({
-            isDragging: true,
-            startX: localX,
-            startY: localY,
-            elementStartX: element.x,
-            elementStartY: element.y,
-            elementId,
-            // Calculate precise offset from touch point to element position
-            dragOffsetX: localX - element.x,
-            dragOffsetY: localY - element.y,
-          });
-          console.log('Drag started for element:', elementId);
-          // Immediately set the drag position for instant response
-          dragPositionRef.current = { x: element.x, y: element.y };
-          setDraggedElementId(elementId);
-          return;
-        }
-      }
-    }
-    // Default canvas tap behavior
-    handleCanvasTap(localX, localY);
-  };
-
-  // Move element in array to change stacking order
-  const bringToFront = () => {
-    if (selectedElements.length === 0) return;
-    const id = selectedElements[0];
-    const idx = elements.findIndex(el => el.id === id);
-    if (idx === -1 || idx === elements.length - 1) return;
-    const newElements = [...elements];
-    const [el] = newElements.splice(idx, 1);
-    newElements.push(el);
-    useDesignStore.setState({ elements: newElements });
-  };
-  const sendToBack = () => {
-    if (selectedElements.length === 0) return;
-    const id = selectedElements[0];
-    const idx = elements.findIndex(el => el.id === id);
-    if (idx <= 0) return;
-    const newElements = [...elements];
-    const [el] = newElements.splice(idx, 1);
-    newElements.unshift(el);
-    useDesignStore.setState({ elements: newElements });
-  };
-
-  // Add state for options modal
-  const [showOptionsModal, setShowOptionsModal] = useState(false);
-
-  // Open TextEditor immediately when text tab is selected
-  useEffect(() => {
-    if (activeTab === 'text') {
-      setEditingTextId('new'); // Use 'new' to indicate creating a new text element
-    }
-  }, [activeTab]);
-
-  // Add state for font controls
-  const [showFontSizePicker, setShowFontSizePicker] = useState(false);
-  const [showFontFamilyPicker, setShowFontFamilyPicker] = useState(false);
-
-  // Add font size and family arrays
-  const FONT_SIZES = [12, 14, 16, 18, 20, 24, 28, 32, 36, 48, 64, 72];
-  const FONT_FAMILIES = ['System', 'Arial', 'Helvetica', 'Times New Roman', 'Georgia'];
-
-  return (
-    <RNSafeAreaView style={{ flex: 1, backgroundColor: '#F4F4FF' }}>
-      {/* Header */}
-      <SafeAreaContextView edges={['top']} style={styles.headerBar}>
-        <TouchableOpacity onPress={() => { if (typeof router !== 'undefined') router.back && router.back(); }} style={{ padding: 4 }}>
-          <Ionicons name="arrow-back" size={24} color="#222" />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Untitled Design</Text>
-        <TouchableOpacity onPress={() => router.push('/(drawer)/TimerScreen')} style={{ padding: 4 }}>
-          <Ionicons name="time-outline" size={28} color="#6366F1" />
-        </TouchableOpacity>
-      </SafeAreaContextView>
-      <View style={{ flex: 1, backgroundColor: '#F4F4FF' }}>
-        <StatusBar barStyle="dark-content" />
-        {/* Top Tab Bar with Save */}
-        <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#F4F4FF', paddingHorizontal: 10, paddingTop: 10, paddingBottom: 10, marginBottom: 10 }}>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ flexDirection: 'row', alignItems: 'center', paddingRight: 16 }}>
-            {['select', 'text', 'images', 'shapes', 'background'].map(tab => (
-              <TouchableOpacity
-                key={tab}
-                onPress={() => setActiveTab(tab as any)}
-                style={{ marginRight: 18, borderBottomWidth: activeTab === tab ? 2 : 0, borderBottomColor: '#6366F1', paddingBottom: 4 }}
-              >
-                <Text style={{ color: activeTab === tab ? '#6366F1' : '#222', fontWeight: activeTab === tab ? 'bold' : 'normal', fontSize: 16 }}>
-                  {tab === 'select' ? 'Select' : tab.charAt(0).toUpperCase() + tab.slice(1)}
-                </Text>
-              </TouchableOpacity>
-            ))}
-            <TouchableOpacity onPress={handleSaveDesign} style={{ marginLeft: 10 }}>
-              <Ionicons name="save" size={22} color="#6366F1" />
-            </TouchableOpacity>
-          </ScrollView>
-        </View>
-
-        {/* Canvas */}
-        <View style={{ flex: 1, backgroundColor: '#F4F4FF', justifyContent: 'center', alignItems: 'center' }}>
-          <ViewShot ref={viewShotRef} style={styles.canvasContainer}>
-            <View
-              ref={canvasRef}
-              style={[styles.canvas, { backgroundColor: canvasBackgroundColor }]}
-              onLayout={handleCanvasLayout}
-              {...panResponder.panHandlers}
-            >
-              <Svg width={CANVAS_WIDTH} height={CANVAS_HEIGHT}>
-                {elements.map(renderElement)}
-                {elements.map(element => (
-                  <React.Fragment key={`handles-${element.id}`}>
-                    {renderResizeHandles(element)}
-                  </React.Fragment>
-                ))}
-              </Svg>
-            </View>
-          </ViewShot>
-        </View>
-
-        {/* Bottom Bar: context-sensitive controls */}
-        <SafeAreaContextView edges={['bottom']} style={{ backgroundColor: '#fff' }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff', padding: 10, borderTopWidth: 1, borderTopColor: '#E0E0E0' }}>
-            {activeTab === 'text' && (
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ flexDirection: 'row', alignItems: 'center', flexGrow: 1, minWidth: 0 }}>
-                {/* Font family selector */}
-                <TouchableOpacity style={{ marginHorizontal: 6, padding: 6, backgroundColor: '#eee', borderRadius: 6 }}>
-                  <Text>Open Sans</Text>
-                </TouchableOpacity>
-                {/* Bold */}
-                <TouchableOpacity style={{ marginHorizontal: 6 }}>
-                  <Text style={{ fontWeight: 'bold', fontSize: 18 }}>B</Text>
-                </TouchableOpacity>
-                {/* Underline */}
-                <TouchableOpacity style={{ marginHorizontal: 6 }}>
-                  <Text style={{ textDecorationLine: 'underline', fontSize: 18 }}>U</Text>
-                </TouchableOpacity>
-                {/* Text Color button (only if a text element is selected) */}
-                {selectedElements.length > 0 && elements.find(el => el.id === selectedElements[0] && el.type === 'text') && (
-                  <TouchableOpacity
-                    style={{ marginHorizontal: 6, padding: 6, backgroundColor: '#E3F2FD', borderRadius: 6, flexDirection: 'row', alignItems: 'center' }}
-                    onPress={() => { setColorPickerTarget('text'); setShowColorPicker(true); }}
-                  >
-                    <Ionicons name="color-palette" size={18} color="#007AFF" />
-                    <Text style={{ marginLeft: 4 }}>Text Color</Text>
-                  </TouchableOpacity>
-                )}
-              </ScrollView>
-            )}
-            {activeTab === 'images' && (
-              <TouchableOpacity onPress={handleImagePicker} style={{ flexDirection: 'row', alignItems: 'center' }}>
-                <Ionicons name="image" size={24} color="#333" />
-                <Text style={{ marginLeft: 8 }}>Upload Image</Text>
-              </TouchableOpacity>
-            )}
-            {activeTab === 'shapes' && (
-              <TouchableOpacity onPress={() => setShowShapePicker(true)} style={{ flexDirection: 'row', alignItems: 'center' }}>
-                <Ionicons name="shapes" size={24} color="#333" />
-                <Text style={{ marginLeft: 8 }}>Add Shape</Text>
-              </TouchableOpacity>
-            )}
-            {activeTab === 'background' && (
-              <TouchableOpacity onPress={() => { setColorPickerTarget('canvas'); setShowColorPicker(true); }} style={{ flexDirection: 'row', alignItems: 'center' }}>
-                <Ionicons name="color-palette" size={24} color="#333" />
-                <Text style={{ marginLeft: 8 }}>Background Color</Text>
-              </TouchableOpacity>
-            )}
-            {/* Options button for shapes in select tab */}
-            {activeTab === 'select' && selectedElements.length > 0 && elements.find(el => el.id === selectedElements[0] && (
-              el.type === 'rectangle' || el.type === 'circle' || el.type === 'ellipse' || el.type === 'triangle' || el.type === 'star' || el.type === 'text')) && (
-              <View style={{ flex: 1 }} />
-            )}
-            {activeTab === 'select' && selectedElements.length > 0 && elements.find(el => el.id === selectedElements[0] && (
-              el.type === 'rectangle' || el.type === 'circle' || el.type === 'ellipse' || el.type === 'triangle' || el.type === 'star' || el.type === 'text')) && (
-              <TouchableOpacity onPress={() => setShowOptionsModal(true)} style={{ backgroundColor: '#E3F2FD', padding: 8, borderRadius: 8, marginLeft: 8, flexDirection: 'row', alignItems: 'center' }}>
-                <Ionicons name="options" size={24} color="#007AFF" />
-                <Text style={{ marginLeft: 4, fontSize: 14, color: '#007AFF' }}>Options</Text>
-              </TouchableOpacity>
-            )}
-            {/* Delete button for any selected element in select tab */}
-            {activeTab === 'select' && selectedElements.length > 0 && (
-              <TouchableOpacity onPress={deleteSelectedElements} style={{ backgroundColor: '#FFEBEE', padding: 8, borderRadius: 8, marginLeft: 8 }}>
-                <Ionicons name="trash" size={24} color="#FF3B30" />
-              </TouchableOpacity>
-            )}
-            {/* Font controls for selected text in select tab */}
-            {activeTab === 'select' && selectedElements.length > 0 && elements.find(el => el.id === selectedElements[0] && el.type === 'text') && (
-              <View style={{ flexDirection: 'row', alignItems: 'center', marginLeft: 8 }}>
-                {/* Font Size */}
-                <TouchableOpacity
-                  style={{ flexDirection: 'row', alignItems: 'center', marginHorizontal: 4, backgroundColor: '#E3F2FD', padding: 8, borderRadius: 8 }}
-                  onPress={() => setShowFontSizePicker(true)}
-                >
-                  <Ionicons name="text" size={18} color="#007AFF" />
-                  <Text style={{ marginLeft: 4, fontSize: 14, color: '#007AFF' }}>
-                    {(() => {
-                      const textElement = elements.find(el => el.id === selectedElements[0]) as TextElement;
-                      return textElement ? textElement.fontSize : 16;
-                    })()}
-                  </Text>
-                </TouchableOpacity>
-                {/* Font Family */}
-                <TouchableOpacity
-                  style={{ flexDirection: 'row', alignItems: 'center', marginHorizontal: 4, backgroundColor: '#E3F2FD', padding: 8, borderRadius: 8 }}
-                  onPress={() => setShowFontFamilyPicker(true)}
-                >
-                  <Ionicons name="text" size={18} color="#007AFF" />
-                  <Text style={{ marginLeft: 4, fontSize: 14, color: '#007AFF' }}>
-                    {(() => {
-                      const textElement = elements.find(el => el.id === selectedElements[0]) as TextElement;
-                      return textElement ? textElement.fontFamily : 'System';
-                    })()}
-                  </Text>
-                </TouchableOpacity>
-              </View>
-            )}
-          </View>
-        </SafeAreaContextView>
-
-        {/* Shape Picker Modal */}
-        <Modal visible={showShapePicker} transparent animationType="fade">
-          <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.2)' }}>
-            <View style={{ backgroundColor: '#fff', borderRadius: 16, padding: 16, elevation: 8 }}>
-              <ShapePicker
-                selected={currentTool}
-                onSelect={type => {
-                  setCurrentTool(type as Tool);
-                  setShowShapePicker(false);
-                }}
-              />
-              <TouchableOpacity style={{ alignSelf: 'flex-end', marginTop: 8 }} onPress={() => setShowShapePicker(false)}>
-                <Text style={{ color: '#6366F1', fontWeight: 'bold' }}>Close</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </Modal>
-
-        {/* Color Picker Modal */}
-        {showColorPicker && (
-          <ColorPicker
-            visible={showColorPicker}
-            onClose={() => setShowColorPicker(false)}
-            title={colorPickerTarget === 'element' ? 'Choose Shape Color' : colorPickerTarget === 'text' ? 'Choose Text Color' : 'Choose Canvas Color'}
-            initialColor={
-              colorPickerTarget === 'element' && selectedElements.length > 0
-                ? (() => {
-                    const selectedElement = elements.find(el => el.id === selectedElements[0]);
-                    if (selectedElement && 'backgroundColor' in selectedElement) {
-                      return selectedElement.backgroundColor;
-                    }
-                    return '#FFFFFF';
-                  })()
-                : colorPickerTarget === 'text' && selectedElements.length > 0
-                ? (() => {
-                    const selectedTextElement = elements.find(el => el.id === selectedElements[0] && el.type === 'text');
-                    if (selectedTextElement && 'color' in selectedTextElement) {
-                      return selectedTextElement.color;
-                    }
-                    return '#000000';
-                  })()
-                : canvasBackgroundColor
-            }
-            onColorSelect={(color) => {
-              setShowColorPicker(false);
-              if (colorPickerTarget === 'canvas') {
-                useDesignStore.getState().setCanvasBackgroundColor(color);
-              } else if (colorPickerTarget === 'element') {
-                if (selectedElements.length > 0) {
-                  // Update background color for all selected elements
-                  selectedElements.forEach(elementId => {
-                    const element = elements.find(el => el.id === elementId);
-                    if (element && 'backgroundColor' in element) {
-                      updateElement(elementId, { backgroundColor: color });
-                    }
-                  });
-                } else {
-                  // Optionally, show a message: No shape selected
-                  Alert && Alert.alert && Alert.alert('No shape selected', 'Please select a shape to change its color.');
-                }
-              } else if (colorPickerTarget === 'text' && selectedElements.length > 0) {
-                // Update text color for all selected text elements
-                selectedElements.forEach(elementId => {
-                  const element = elements.find(el => el.id === elementId);
-                  if (element && element.type === 'text') {
-                    updateElement(elementId, { color });
-                  }
-                });
-              }
-            }}
-          />
-        )}
-
-        <TextEditor
-          visible={editingTextId !== null}
-          onClose={() => {
-            setEditingTextId(null);
-            setActiveTab('select');
-          }}
-          textElementId={editingTextId}
-        />
-
-        {/* Options Modal */}
-        <Modal visible={showOptionsModal} transparent animationType="fade">
-          <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.2)' }}>
-            <View style={{ backgroundColor: '#fff', borderRadius: 16, padding: 16, elevation: 8, minWidth: 200 }}>
-              <Text style={{ fontSize: 18, fontWeight: 'bold', marginBottom: 16, textAlign: 'center' }}>Element Options</Text>
-              <TouchableOpacity 
-                style={{ flexDirection: 'row', alignItems: 'center', padding: 12, borderRadius: 8, marginBottom: 8 }}
-                onPress={() => { setShowOptionsModal(false); bringToFront(); }}
-              >
-                <Ionicons name="arrow-up-circle" size={20} color="#007AFF" />
-                <Text style={{ marginLeft: 8, fontSize: 16 }}>Bring to Front</Text>
-              </TouchableOpacity>
-              <TouchableOpacity 
-                style={{ flexDirection: 'row', alignItems: 'center', padding: 12, borderRadius: 8, marginBottom: 8 }}
-                onPress={() => { setShowOptionsModal(false); sendToBack(); }}
-              >
-                <Ionicons name="arrow-down-circle" size={20} color="#007AFF" />
-                <Text style={{ marginLeft: 8, fontSize: 16 }}>Send to Back</Text>
-              </TouchableOpacity>
-              {(() => {
-                const selectedElement = elements.find(el => el.id === selectedElements[0]);
-                if (selectedElement && (selectedElement.type === 'rectangle' || selectedElement.type === 'circle' || selectedElement.type === 'ellipse' || selectedElement.type === 'triangle' || selectedElement.type === 'star')) {
-                  return (
-                    <>
-                      <TouchableOpacity 
-                        style={{ flexDirection: 'row', alignItems: 'center', padding: 12, borderRadius: 8, marginBottom: 8 }}
-                        onPress={() => { setShowOptionsModal(false); setColorPickerTarget('element'); setShowColorPicker(true); }}
-                      >
-                        <Ionicons name="color-palette" size={20} color="#007AFF" />
-                        <Text style={{ marginLeft: 8, fontSize: 16 }}>Shape Color</Text>
-                      </TouchableOpacity>
-                      <TouchableOpacity 
-                        style={{ flexDirection: 'row', alignItems: 'center', padding: 12, borderRadius: 8, marginBottom: 8 }}
-                        onPress={() => { setShowOptionsModal(false); handleInsertImageIntoShape(); }}
-                      >
-                        <Ionicons name="image" size={20} color="#007AFF" />
-                        <Text style={{ marginLeft: 8, fontSize: 16 }}>Insert Image</Text>
-                      </TouchableOpacity>
-                    </>
-                  );
-                }
-                return null;
-              })()}
-              {(() => {
-                const selectedElement = elements.find(el => el.id === selectedElements[0]);
-                if (selectedElement && selectedElement.type === 'text') {
-                  return (
-                    <TouchableOpacity 
-                      style={{ flexDirection: 'row', alignItems: 'center', padding: 12, borderRadius: 8, marginBottom: 8 }}
-                      onPress={() => { setShowOptionsModal(false); setColorPickerTarget('text'); setShowColorPicker(true); }}
-                    >
-                      <Ionicons name="color-palette" size={20} color="#007AFF" />
-                      <Text style={{ marginLeft: 8, fontSize: 16 }}>Text Color</Text>
-                    </TouchableOpacity>
-                  );
-                }
-                return null;
-              })()}
-              <TouchableOpacity 
-                style={{ alignSelf: 'center', marginTop: 8, padding: 8 }}
-                onPress={() => setShowOptionsModal(false)}
-              >
-                <Text style={{ color: '#6366F1', fontWeight: 'bold' }}>Cancel</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </Modal>
-
-        {/* Font Size Picker Modal */}
-        <Modal visible={showFontSizePicker} transparent animationType="fade">
-          <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.2)' }}>
-            <View style={{ backgroundColor: '#fff', borderRadius: 16, padding: 16, elevation: 8, minWidth: 200 }}>
-              <Text style={{ fontSize: 18, fontWeight: 'bold', marginBottom: 16, textAlign: 'center' }}>Font Size</Text>
-              <ScrollView style={{ maxHeight: 300 }}>
-                {FONT_SIZES.map((size) => (
-                  <TouchableOpacity
-                    key={size}
-                    style={{ flexDirection: 'row', alignItems: 'center', padding: 12, borderRadius: 8, marginBottom: 4 }}
-                    onPress={() => {
-                      if (selectedElements.length > 0) {
-                        const textElement = elements.find(el => el.id === selectedElements[0]) as TextElement;
-                        if (textElement) {
-                          updateElement(selectedElements[0], { fontSize: size });
-                        }
-                      }
-                      setShowFontSizePicker(false);
-                    }}
-                  >
-                    <Text style={{ fontSize: size, marginLeft: 8 }}>{size}</Text>
-                  </TouchableOpacity>
-                ))}
-              </ScrollView>
-              <TouchableOpacity 
-                style={{ alignSelf: 'center', marginTop: 8, padding: 8 }}
-                onPress={() => setShowFontSizePicker(false)}
-              >
-                <Text style={{ color: '#6366F1', fontWeight: 'bold' }}>Cancel</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </Modal>
-
-        {/* Font Family Picker Modal */}
-        <Modal visible={showFontFamilyPicker} transparent animationType="fade">
-          <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.2)' }}>
-            <View style={{ backgroundColor: '#fff', borderRadius: 16, padding: 16, elevation: 8, minWidth: 200 }}>
-              <Text style={{ fontSize: 18, fontWeight: 'bold', marginBottom: 16, textAlign: 'center' }}>Font Family</Text>
-              <ScrollView style={{ maxHeight: 300 }}>
-                {FONT_FAMILIES.map((family) => (
-                  <TouchableOpacity
-                    key={family}
-                    style={{ flexDirection: 'row', alignItems: 'center', padding: 12, borderRadius: 8, marginBottom: 4 }}
-                    onPress={() => {
-                      if (selectedElements.length > 0) {
-                        const textElement = elements.find(el => el.id === selectedElements[0]) as TextElement;
-                        if (textElement) {
-                          updateElement(selectedElements[0], { fontFamily: family });
-                        }
-                      }
-                      setShowFontFamilyPicker(false);
-                    }}
-                  >
-                    <Text style={{ fontFamily: family, marginLeft: 8 }}>{family}</Text>
-                  </TouchableOpacity>
-                ))}
-              </ScrollView>
-              <TouchableOpacity 
-                style={{ alignSelf: 'center', marginTop: 8, padding: 8 }}
-                onPress={() => setShowFontFamilyPicker(false)}
-              >
-                <Text style={{ color: '#6366F1', fontWeight: 'bold' }}>Cancel</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </Modal>
-      </View>
-    </RNSafeAreaView>
-  );
-} 

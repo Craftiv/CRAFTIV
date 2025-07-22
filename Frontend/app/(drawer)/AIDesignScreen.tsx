@@ -1,6 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
+import Voice from '@react-native-voice/voice';
 import { useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
     ActivityIndicator,
     Alert,
@@ -27,6 +28,38 @@ export default function AIDesignScreen() {
   } = useAIDesignStore();
   
   const [localPrompt, setLocalPrompt] = useState(prompt);
+  const [isListening, setIsListening] = useState(false);
+
+  // Voice recognition handlers
+  const onSpeechResults = (event: any) => {
+    if (event.value && event.value.length > 0) {
+      setLocalPrompt(event.value[0]);
+    }
+    setIsListening(false);
+  };
+  const onSpeechError = (event: any) => {
+    setIsListening(false);
+    Alert.alert('Voice Input Error', event.error?.message || 'Could not recognize speech.');
+  };
+
+  // Attach/detach listeners
+  useEffect(() => {
+    Voice.onSpeechResults = onSpeechResults;
+    Voice.onSpeechError = onSpeechError;
+    return () => {
+      Voice.destroy().then(Voice.removeAllListeners);
+    };
+  }, []);
+
+  const handleVoiceInput = async () => {
+    try {
+      setIsListening(true);
+      await Voice.start('en-US');
+    } catch (e) {
+      setIsListening(false);
+      Alert.alert('Voice Input Error', 'Could not start voice recognition.');
+    }
+  };
 
   const handleGenerate = async () => {
     if (!localPrompt.trim()) {
@@ -114,10 +147,10 @@ export default function AIDesignScreen() {
             </Text>
           </View>
 
-          {/* Voice Input Button (Optional Enhancement) */}
-          <TouchableOpacity style={styles.voiceButton}>
-            <Ionicons name="mic" size={20} color="#6366F1" />
-            <Text style={styles.voiceButtonText}>Voice Input</Text>
+          {/* Voice Input Button */}
+          <TouchableOpacity style={styles.voiceButton} onPress={handleVoiceInput} disabled={isListening}>
+            <Ionicons name="mic" size={20} color={isListening ? '#A78BFA' : '#6366F1'} />
+            <Text style={styles.voiceButtonText}>{isListening ? 'Listening...' : 'Voice Input'}</Text>
           </TouchableOpacity>
 
           {/* Generate Button */}

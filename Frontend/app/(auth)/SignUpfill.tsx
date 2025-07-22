@@ -3,18 +3,20 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
 import {
-    ActivityIndicator,
-    Alert,
-    BackHandler,
-    Image,
-    Keyboard,
-    Pressable,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    View,
+  ActivityIndicator,
+  Alert,
+  BackHandler,
+  Image,
+  Keyboard,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
 } from 'react-native';
+// Remove import { apiFetch } from '../constants/apiClient';
 import { useAuth } from '../../contexts/AuthContext';
 
 export default function EmailAuth() {
@@ -59,39 +61,43 @@ export default function EmailAuth() {
       return;
     }
 
-    // 🔁 Simulated API delay and success
-    Alert.alert('Signing up...', 'Please wait');
-    setTimeout(() => {
-      Alert.alert('Success', 'Account created!');
-      setIsAuthenticated(true);
-      // Clear the time goal popup flag so it shows after signup
-      AsyncStorage.removeItem('hasShownTimeGoal').catch(console.error);
-      router.replace('/(drawer)/(tabs)');
-    }, 1500);
+    setLoading(true);
+    try {
+      // Try different URLs based on platform and environment
+      let backendUrl;
+        backendUrl = 'http://10.132.53.119:8081/api/auth/register';
+      
+      console.log('Platform:', Platform.OS);
+      console.log('Backend URL:', backendUrl);
+      console.log('Attempting to connect to backend...');
+      const response = await fetch('http://10.132.53.119:8081/api/auth/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          firstname,
+          lastname,
+          email,
+          password
+        }),
+      });
 
-    // 2. API Request
-    // setLoading(true);
-    // try {
-    //   const response = await fetch('https://your-backend.com/api/signup', {
-    //     method: 'POST',
-    //     headers: { 'Content-Type': 'application/json' },
-    //     body: JSON.stringify({ firstname, lastname, email, password }),
-    //   });
+      const data = await response.json();
 
-    //   const data = await response.json();
-
-    //   if (response.ok) {
-    //     Alert.alert('Success', 'Account created!');
-    //     router.replace('/(tabs)');
-    //   } else {
-    //     Alert.alert('Signup Failed', data.error || 'Something went wrong');
-    //   }
-    // } catch (err) {
-    //   console.error(err);
-    //   Alert.alert('Network Error', 'Could not reach the server');
-    // } finally {
-    //   setLoading(false);
-    // }
+      if (response.ok) {
+        console.log('✅ Backend connected: Signup successful response received');
+        Alert.alert('Success', 'Account created!');
+        setIsAuthenticated(true);
+        AsyncStorage.removeItem('hasShownTimeGoal').catch(console.error);
+        router.replace('/(drawer)/(tabs)');
+      } else {
+        Alert.alert('Signup Failed', data.error || 'Something went wrong');
+      }
+    } catch (err) {
+      console.error(err);
+      Alert.alert('Network Error', 'Could not reach the server');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -99,6 +105,19 @@ export default function EmailAuth() {
       contentContainerStyle={styles.wrapper}
       keyboardShouldPersistTaps="handled"
     >
+      <Pressable
+        onPress={() => {
+          if (router.canGoBack && router.canGoBack()) {
+            router.back();
+          } else {
+            router.push('/Splash');
+          }
+        }}
+        hitSlop={10}
+        style={{ position: 'absolute', top: 40, left: 10, zIndex: 10 }}
+      >
+        <Ionicons name="chevron-back" size={28} color="#333" />
+      </Pressable>
       <View><Image source={require('../../assets/images/Logo.png')} style={styles.logo} />
       </View>
       <View style={styles.container}>

@@ -7,6 +7,7 @@ import * as WebBrowser from 'expo-web-browser';
 import { jwtDecode } from 'jwt-decode';
 import { useCallback, useState } from 'react';
 import { Alert, BackHandler, Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { API_KEYS } from '../../constants/apiKeys';
 
 WebBrowser.maybeCompleteAuthSession();
 const navigation=useNavigation;
@@ -17,13 +18,13 @@ type UserInfo = {
 };
 
 
-export default function LogIn2() {
+export default function () {
   const router = useRouter();
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [userInfo, setUserInfo] = useState<UserInfo | null>(null);
 
   const [request, response, promptAsync] = Google.useAuthRequest({
-    clientId: 'web 678627646589-bkkoetvbd02oglu9noc7h2m1ej1cu9dv.apps.googleusercontent.com', // Replace this with your actual client ID
+    clientId: API_KEYS.GOOGLE_CLIENT_ID, // Use imported client ID
     responseType: 'id_token',
     scopes: ['openid', 'profile', 'email'],
   });
@@ -53,7 +54,7 @@ export default function LogIn2() {
 
   const sendIdTokenToBackend = async (idToken: string) => {
     try {
-      const backendResponse = await fetch('http://localhost:8080/api/auth/google', {
+      const backendResponse = await fetch('http://10.132.53.119:8081/api/auth/google', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ idToken }),
@@ -63,6 +64,7 @@ export default function LogIn2() {
         throw new Error(errorData.message || 'Failed to authenticate with backend');
       }
       const data = await backendResponse.json();
+      console.log('✅ Backend connected: Google login successful response received');
       await AsyncStorage.setItem('userToken', data.token);
       // Clear the time goal popup flag so it shows after login
       await AsyncStorage.removeItem('hasShownTimeGoal');

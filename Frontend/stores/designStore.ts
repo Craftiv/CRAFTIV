@@ -89,6 +89,7 @@ interface DesignStore {
   loadDesignById: (designId: string) => Promise<boolean>;
   deleteDesignById: (designId: string) => Promise<void>;
   clearDesign: () => void;
+  setElements: (elements: Element[]) => void;
 }
 
 const generateId = () => Math.random().toString(36).substr(2, 9);
@@ -123,6 +124,14 @@ export const useDesignStore = create<DesignStore>()(
       // Element actions
       addElement: (element: Element) => {
         const { elements, history } = get();
+        
+        // Check if element with this ID already exists
+        const existingElement = elements.find(el => el.id === element.id);
+        if (existingElement) {
+          console.warn(`Element with ID ${element.id} already exists, skipping add`);
+          return;
+        }
+        
         const newElements = [...elements, element];
         const newHistory = addToHistory(history, newElements);
         
@@ -383,6 +392,24 @@ export const useDesignStore = create<DesignStore>()(
           selectedElements: [],
           canvasBackgroundColor: '#FFFFFF',
           history: createHistoryState([]),
+        });
+      },
+
+      setElements: (elements: Element[]) => {
+        // Ensure all elements have unique IDs
+        const elementsWithUniqueIds = elements.map((element, index) => {
+          if (!element.id || elements.filter(el => el.id === element.id).length > 1) {
+            const uniqueId = `${element.type}_${Date.now()}_${index}_${Math.random().toString(36).substr(2, 9)}`;
+            return { ...element, id: uniqueId };
+          }
+          return element;
+        });
+        
+        const newHistory = createHistoryState(elementsWithUniqueIds);
+        set({
+          elements: elementsWithUniqueIds,
+          selectedElements: [],
+          history: newHistory,
         });
       },
     })

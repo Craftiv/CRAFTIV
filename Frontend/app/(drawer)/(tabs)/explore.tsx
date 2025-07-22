@@ -99,17 +99,23 @@ export default function ExploreScreen() {
       imageMap = imageData.images || {};
     }
 
-    // 4. Assign URLs to image elements
-    const elementsWithImages = elements.map(el => {
+    // 4. Assign URLs to image elements (before generating unique IDs)
+    const elementsWithImages = elements.map((el, index) => {
+      let updated = { ...el };
       if (el.type === 'image' && imageMap[el.id]) {
-        return { ...el, uri: imageMap[el.id] };
+        let url = imageMap[el.id];
+        url = url.replace(/^[^h]+(https?:\/\/)/, '$1');
+        // Only set uri if the element is an image
+        (updated as any).uri = url;
       }
-      return el;
+      // Now assign a unique ID for all elements
+      const uniqueId = `${el.type}_${Date.now()}_${index}_${Math.random().toString(36).substr(2, 9)}`;
+      updated.id = uniqueId;
+      return updated;
     });
 
-    // 5. Add to store
-    designStore.clearDesign();
-    elementsWithImages.forEach(el => designStore.addElement(el));
+    // 5. Add to store with unique IDs
+    designStore.setElements(elementsWithImages);
   }
 
   return (
@@ -189,7 +195,10 @@ export default function ExploreScreen() {
                   onPress={async () => {
                     await importFigmaFrame(selectedTemplate.id);
                     setModalVisible(false);
-                    router.push('/(drawer)/CanvaDesignPage');
+                    router.push({
+                      pathname: '/(drawer)/TemplateEditScreen',
+                      params: { templateName: selectedTemplate.name }
+                    } as any);
                   }}
                 >
                   <Text style={styles.editBtnText}>Edit in App</Text>

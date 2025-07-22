@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { API_KEYS } from '../constants/apiKeys';
 
 export interface DesignData {
   id: string;
@@ -47,22 +48,89 @@ export const useAIDesignStore = create<AIDesignState>((set, get) => ({
     set({ isLoading: true, error: null });
     
     try {
-      // Simulate API call to backend
-      const response = await fetch('/api/ai-design', {
+      console.log('Starting AI generation with prompt:', prompt);
+      console.log('Using API key:', API_KEYS.DEEPAI_API_KEY ? 'Present' : 'Missing');
+      
+      // Try alternative DeepAI endpoint and format
+      const deepAIResponse = await fetch('https://api.deepai.org/api/text2img', {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
+          'Api-Key': API_KEYS.DEEPAI_API_KEY,
+          'Content-Type': 'application/x-www-form-urlencoded',
         },
-        body: JSON.stringify({ prompt }),
+        body: `text=${encodeURIComponent(prompt)}`,
       });
       
-      if (!response.ok) {
-        throw new Error('Failed to generate design');
+      console.log('DeepAI Response status:', deepAIResponse.status);
+      console.log('DeepAI Response headers:', Object.fromEntries(deepAIResponse.headers.entries()));
+      
+      if (!deepAIResponse.ok) {
+        const errorText = await deepAIResponse.text();
+        console.error('DeepAI API error response:', errorText);
+        throw new Error(`DeepAI API error: ${deepAIResponse.status} - ${errorText}`);
       }
       
-      const data = await response.json();
+      const deepAIData = await deepAIResponse.json();
+      console.log('DeepAI Response data:', deepAIData);
       
-      // For now, create mock data if API is not available
+      // Check for different possible response formats
+      const imageUrl = deepAIData.output_url || deepAIData.url || deepAIData.id;
+      
+      if (!imageUrl) {
+        console.error('No image URL in DeepAI response:', deepAIData);
+        throw new Error('No image generated from DeepAI - missing image URL');
+      }
+      
+      // Create design data with the generated image
+      const generatedResult: DesignData = {
+        id: Date.now().toString(),
+        title: `AI Generated: ${prompt.slice(0, 30)}...`,
+        type: 'design',
+        elements: [
+          {
+            id: '1',
+            type: 'image',
+            uri: imageUrl,
+            x: 50,
+            y: 50,
+            width: 300,
+            height: 200,
+          },
+          {
+            id: '2',
+            type: 'text',
+            text: 'AI Generated Design',
+            x: 100,
+            y: 270,
+            fontSize: 18,
+            color: '#333333',
+            fontFamily: 'System',
+          }
+        ],
+        thumbnail: imageUrl,
+        description: prompt,
+        category: 'AI Generated',
+        createdAt: new Date().toISOString(),
+      };
+      
+      console.log('Successfully generated design:', generatedResult);
+      set({ result: generatedResult, isLoading: false });
+      return generatedResult;
+      
+    } catch (error: any) {
+      console.error('AI generation error:', error);
+      console.error('Error details:', {
+        message: error.message,
+        stack: error.stack,
+        name: error.name
+      });
+      
+      set({ 
+        error: error.message || 'Failed to generate design. Please try again.',
+        isLoading: false 
+      });
+      
+      // Fallback to mock data if API fails
       const mockResult: DesignData = {
         id: Date.now().toString(),
         title: `AI Generated: ${prompt.slice(0, 30)}...`,
@@ -93,44 +161,6 @@ export const useAIDesignStore = create<AIDesignState>((set, get) => ({
         createdAt: new Date().toISOString(),
       };
       
-      set({ result: mockResult, isLoading: false });
-      return mockResult;
-      
-    } catch (error) {
-      // If network error, create mock data for demo purposes
-      console.log('API call failed, using mock data:', error);
-      
-      const mockResult: DesignData = {
-        id: Date.now().toString(),
-        title: `AI Generated: ${prompt.slice(0, 30)}...`,
-        type: 'design',
-        elements: [
-          {
-            id: '1',
-            type: 'text',
-            text: 'AI Generated Design',
-            x: 100,
-            y: 100,
-            fontSize: 24,
-            color: '#000000',
-          },
-          {
-            id: '2',
-            type: 'rectangle',
-            x: 50,
-            y: 50,
-            width: 200,
-            height: 150,
-            backgroundColor: '#6366F1',
-          }
-        ],
-        thumbnail: 'https://placehold.co/300x200/6366F1/FFFFFF?text=AI+Design',
-        description: prompt,
-        category: 'AI Generated',
-        createdAt: new Date().toISOString(),
-      };
-      
-      set({ result: mockResult, isLoading: false });
       return mockResult;
     }
   },

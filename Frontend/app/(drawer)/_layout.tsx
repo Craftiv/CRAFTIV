@@ -46,6 +46,13 @@ export default function DrawerLayout() {
         }} 
       />
       <Drawer.Screen 
+        name="TemplateEditScreen" 
+        options={{ 
+          title: 'Template Editor',
+          drawerItemStyle: { display: 'none' }
+        }} 
+      />
+      <Drawer.Screen 
         name="AIDesignScreen" 
         options={{ 
           title: 'AI Design Assistant',
