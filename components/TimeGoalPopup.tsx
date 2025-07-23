@@ -26,11 +26,7 @@ export default function TimeGoalPopup({ visible, onClose }: TimeGoalPopupProps) 
   const [customMinutes, setCustomMinutes] = useState('60'); // Default to 60 minutes
   const [customHours, setCustomHours] = useState('');
 
-  // Debug logging for button state
-  console.log('TimeGoalPopup render - selectedTime:', selectedTime, 'button disabled:', selectedTime === null || selectedTime < 0);
-
   const handleTimeSelect = (minutes: number) => {
-    console.log('Time selected:', minutes);
     setSelectedTime(minutes);
     // Calculate hours and minutes from total minutes
     const hrs = Math.floor(minutes / 60);
@@ -46,42 +42,31 @@ export default function TimeGoalPopup({ visible, onClose }: TimeGoalPopupProps) 
     const totalMinutes = hours * 60 + minutes;
     // Allow 0 minutes (user might want a very short timer)
     setSelectedTime(totalMinutes);
-    console.log('Custom time changed:', { hours, minutes, totalMinutes });
   };
 
   const handleStartSession = () => {
-    console.log('🎯 START BUTTON PRESSED!');
-    console.log('handleStartSession called with selectedTime:', selectedTime);
     
     try {
       if (selectedTime !== null && selectedTime >= 0) {
-        console.log('Starting timer with:', selectedTime, 'minutes');
         
         // Reset the timer first to ensure clean state
-        console.log('Resetting timer...');
         reset();
         
         // Set the countdown duration in milliseconds
         const durationMs = selectedTime * 60 * 1000;
-        console.log('Setting countdown duration to:', durationMs, 'ms');
         setCountdownDuration(durationMs);
         
         // Wait for state to update before starting
         setTimeout(() => {
-          console.log('Starting timer...');
           start();
-          console.log('Dismissing keyboard and closing popup...');
           Keyboard.dismiss();
           onClose();
-          console.log('Navigating to TimerScreen...');
           router.push('/(drawer)/TimerScreen');
         }, 50);
       } else {
-        console.log('Invalid selected time:', selectedTime);
         alert('Please select a valid time duration');
       }
     } catch (error) {
-      console.error('Error in handleStartSession:', error);
       alert('Error starting timer: ' + (error instanceof Error ? error.message : String(error)));
     }
   };

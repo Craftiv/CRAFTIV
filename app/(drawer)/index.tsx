@@ -53,7 +53,6 @@ export default function SignUpScreen() {
           }
 
           const data = await backendResponse.json();
-          console.log('✅ Backend connected: Google login successful response received');
 
           // Save user token from backend
           await AsyncStorage.setItem('userToken', data.token);

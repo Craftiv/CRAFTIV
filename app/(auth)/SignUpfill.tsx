@@ -18,10 +18,11 @@ import {
 } from 'react-native';
 // Remove import { apiFetch } from '../constants/apiClient';
 import { useAuth } from '../../contexts/AuthContext';
+import { format } from 'date-fns';
 
 export default function EmailAuth() {
   const router = useRouter();
-  const { setIsAuthenticated } = useAuth();
+  const { setIsAuthenticated, setUser } = useAuth();
   const [firstname, setFirstname] = useState('');
   const [lastname, setLastname] = useState('');
   const [email, setEmail] = useState('');
@@ -65,8 +66,7 @@ export default function EmailAuth() {
     try {
       // Try different URLs based on platform and environment
       let backendUrl;
-        backendUrl = 'http://10.132.53.119:8081/api/auth/register';
-      
+      backendUrl = 'http://10.132.53.119:8081/api/auth/register';
       console.log('Platform:', Platform.OS);
       console.log('Backend URL:', backendUrl);
       console.log('Attempting to connect to backend...');
@@ -87,6 +87,16 @@ export default function EmailAuth() {
         console.log('✅ Backend connected: Signup successful response received');
         Alert.alert('Success', 'Account created!');
         setIsAuthenticated(true);
+        // Save user info to context
+        const username = `${firstname.trim().toLowerCase()}_${lastname.trim().toLowerCase()}`;
+        const joined = `Joined ${format(new Date(), 'MMM yyyy')}`;
+        setUser({
+          name: `${firstname} ${lastname}`.trim(),
+          email,
+          username,
+          joined,
+          profileImage: null,
+        });
         AsyncStorage.removeItem('hasShownTimeGoal').catch(console.error);
         router.replace('/(drawer)/(tabs)');
       } else {

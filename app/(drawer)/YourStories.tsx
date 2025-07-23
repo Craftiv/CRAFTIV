@@ -158,17 +158,11 @@ export default function YourStories() {
 
   const loadStories = async () => {
     try {
-      console.log('YourStories: Loading stories from AsyncStorage...');
       const savedStories = await AsyncStorage.getItem('yourStories');
-      console.log('YourStories: Raw saved stories:', savedStories);
       if (savedStories) {
         const parsedStories = JSON.parse(savedStories);
-        console.log('YourStories: Parsed stories:', parsedStories);
-        console.log('YourStories: Number of stories:', parsedStories.length);
-        console.log('YourStories: First story structure:', parsedStories[0]);
         setStories(parsedStories);
       } else {
-        console.log('YourStories: No saved stories found');
       }
     } catch (error: any) {
       console.error('YourStories: Error loading stories:', error);
@@ -185,7 +179,6 @@ export default function YourStories() {
 
   const handleDesignPress = async (designId: string) => {
     try {
-      console.log('YourStories: Attempting to load design with ID:', designId);
       
       // Find the story in the current stories array
       const story = stories.find(s => s.id === designId);

@@ -45,8 +45,19 @@ export default function LoginScreen() {
     }, [router])
   );
 
+  // Simulate login for development when backend is not ready
+  const simulateLogin = async () => {
+    setLoading(true);
+    setTimeout(async () => {
+      setIsAuthenticated(true);
+      await AsyncStorage.removeItem('hasShownTimeGoal').catch(console.error);
+      router.replace('/(drawer)/(tabs)');
+      setLoading(false);
+    }, 1000); // Simulate network delay
+  };
+
   const handleLogin = async () => {
-    if (!name || !email || !password) {
+    if (!email || !password) {
       Alert.alert('Missing Fields', 'Please fill in all fields.');
       return;
     }
@@ -55,39 +66,31 @@ export default function LoginScreen() {
       return;
     }
 
-    
-
     setLoading(true);
 
-    // Simulated API delay and success
-    Alert.alert('Loging in...', 'Please wait');
-    setTimeout(() => {
-      Alert.alert('Success', 'Log in');
-      setIsAuthenticated(true);
-      // Clear the time goal popup flag so it shows after login
-      AsyncStorage.removeItem('hasShownTimeGoal').catch(console.error);
-      router.replace('/(drawer)/(tabs)');
-    }, 1500);
-
+    // Uncomment this block when backend is ready
     // try {
-    //   const response = await fetch('https://your-backend.com/api/login', {
+    //   const response = await fetch('http://Localhost:8080/api/auth/login', {
     //     method: 'POST',
     //     headers: { 'Content-Type': 'application/json' },
-    //     body: JSON.stringify({ name, email, password }),
+    //     body: JSON.stringify({ usernameOrEmail: email, password }),
     //   });
-
     //   const data = await response.json();
-
-    //   if (response.ok && data.success) {
-    //     router.replace('/');
+    //   if (response.ok && data.token) {
+    //     setIsAuthenticated(true);
+    //     AsyncStorage.removeItem('hasShownTimeGoal').catch(console.error);
+    //     router.replace('/(drawer)/(tabs)'); // Navigate to tabs root (index)
     //   } else {
-    //     Alert.alert('Login Failed', data.message || 'Invalid credentials');
+    //     Alert.alert('Login Failed', data.error || 'Invalid credentials');
     //   }
     // } catch (error) {
     //   Alert.alert('Network Error', 'Please try again later');
     // } finally {
     //   setLoading(false);
     // }
+
+    // Simulate login for now
+    simulateLogin();
   };
 
   const validateEmail = (value: string) => {

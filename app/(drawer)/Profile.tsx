@@ -3,21 +3,19 @@ import * as ImagePicker from 'expo-image-picker';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { Alert, Image, Pressable, StyleSheet, Switch, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { Alert, Image, Pressable, StyleSheet, Switch, Text, TextInput, TouchableOpacity, View, Modal } from 'react-native';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTheme } from '../../contexts/ThemeContext';
 
 export default function Profile() {
-  const { setIsAuthenticated, setProfileImage, profileImage } = useAuth();
+  const { setIsAuthenticated, user, setUser } = useAuth();
+  console.log('Profile user:', user);
   const { isDark, toggleTheme, colors } = useTheme();
-  const [name, setName] = useState('Mina Torgah');
-  const [username] = useState('mina_torgah');
-  const [joined] = useState('Joined Jan 2024');
-  const [email, setEmail] = useState('torgahdelamino@gmail.com');
   const [editingField, setEditingField] = useState<'name' | 'email' | null>(null); // 'name' or 'email'
   const [tempValue, setTempValue] = useState('');
   const [logoutPressed, setLogoutPressed] = useState(false);
   const [notifications, setNotifications] = useState(true);
+  const [modalVisible, setModalVisible] = useState(false);
 
   // Example stats
   const stats = [
@@ -28,12 +26,12 @@ export default function Profile() {
 
   const startEdit = (field: 'name' | 'email') => {
     setEditingField(field);
-    setTempValue(field === 'name' ? name : email);
+    setTempValue(field === 'name' ? user.name : user.email);
   };
 
   const saveEdit = () => {
-    if (editingField === 'name') setName(tempValue);
-    if (editingField === 'email') setEmail(tempValue);
+    if (editingField === 'name') setUser({ ...user, name: tempValue });
+    if (editingField === 'email') setUser({ ...user, email: tempValue });
     setEditingField(null);
   };
 
@@ -45,7 +43,7 @@ export default function Profile() {
       quality: 0.7,
     });
     if (!result.canceled && result.assets && result.assets.length > 0) {
-      setProfileImage(result.assets[0].uri);
+      setUser({ ...user, profileImage: result.assets[0].uri });
     }
   };
 
@@ -84,17 +82,30 @@ export default function Profile() {
         </View>
         {/* Avatar and Edit Photo */}
         <View style={styles.avatarSection}>
-          <View style={[styles.avatarCircle, { backgroundColor: colors.primary, shadowColor: colors.text }]}> 
-            {profileImage ? (
-              <Image source={{ uri: profileImage }} style={styles.avatarImg} />
-            ) : (
-              <Ionicons name="person" size={54} color="#fff" />
-            )}
-            <TouchableOpacity style={styles.avatarEditOverlay} onPress={pickImage}>
-              <Ionicons name="camera" size={20} color="#fff" />
-            </TouchableOpacity>
-          </View>
+          <TouchableOpacity onPress={() => user.profileImage && setModalVisible(true)} activeOpacity={user.profileImage ? 0.7 : 1}>
+            <View style={[styles.avatarCircle, { backgroundColor: colors.primary, shadowColor: colors.text }]}> 
+              {user.profileImage ? (
+                <Image source={{ uri: user.profileImage }} style={styles.avatarImg} />
+              ) : (
+                <Ionicons name="person" size={54} color="#fff" />
+              )}
+              <TouchableOpacity style={styles.avatarEditOverlay} onPress={pickImage}>
+                <Ionicons name="camera" size={20} color="#fff" />
+              </TouchableOpacity>
+            </View>
+          </TouchableOpacity>
         </View>
+        {/* Modal for viewing profile picture */}
+        <Modal visible={modalVisible} transparent animationType="fade" onRequestClose={() => setModalVisible(false)}>
+          <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.85)', justifyContent: 'center', alignItems: 'center' }}>
+            <TouchableOpacity style={{ position: 'absolute', top: 40, right: 30, zIndex: 2 }} onPress={() => setModalVisible(false)}>
+              <Ionicons name="close" size={36} color="#fff" />
+            </TouchableOpacity>
+            {user.profileImage && (
+              <Image source={{ uri: user.profileImage }} style={{ width: 300, height: 300, borderRadius: 20, resizeMode: 'contain' }} />
+            )}
+          </View>
+        </Modal>
         {/* Name, Username, Joined */}
         <View style={[styles.infoCard, { backgroundColor: colors.surface, shadowColor: colors.text }]}> 
           <View style={styles.infoRow2}>
@@ -108,7 +119,7 @@ export default function Profile() {
                 autoFocus
               />
             ) : (
-              <Text style={[styles.infoValue, { color: colors.text }]}>{name}</Text>
+              <Text style={[styles.infoValue, { color: colors.text }]}>{user.name}</Text>
             )}
             <TouchableOpacity style={styles.editBtn} onPress={() => startEdit('name')}>
               <Ionicons name="pencil" size={16} color={colors.primary} />
@@ -116,11 +127,11 @@ export default function Profile() {
           </View>
           <View style={styles.infoRow2}>
             <Text style={[styles.infoLabel, { color: colors.textSecondary }]}>Username</Text>
-            <Text style={[styles.infoValue, { color: colors.text }]}>{username}</Text>
+            <Text style={[styles.infoValue, { color: colors.text }]}>{user.username}</Text>
           </View>
           <View style={styles.infoRow2}>
             <Text style={[styles.infoLabel, { color: colors.textSecondary }]}>Joined</Text>
-            <Text style={[styles.infoValue, { color: colors.text }]}>{joined}</Text>
+            <Text style={[styles.infoValue, { color: colors.text }]}>{user.joined}</Text>
           </View>
         </View>
         {/* Email Row */}
@@ -137,7 +148,7 @@ export default function Profile() {
                 keyboardType="email-address"
               />
             ) : (
-              <Text style={[styles.infoValue, { color: colors.text }]}>{email}</Text>
+              <Text style={[styles.infoValue, { color: colors.text }]}>{user.email}</Text>
             )}
             <TouchableOpacity style={styles.editBtn} onPress={() => startEdit('email')}>
               <Ionicons name="pencil" size={16} color={colors.primary} />

@@ -11,6 +11,8 @@ import TimeGoalPopup from '../../../components/TimeGoalPopup';
 import { useDesigns } from '../../../contexts/DesignContext';
 import { useTheme } from '../../../contexts/ThemeContext';
 import { useTemplates } from '../../../hooks/useTemplates';
+import { useAuth } from '../../../contexts/AuthContext';
+import { API_KEYS } from '../../../constants/apiKeys';
 
 // Dummy data for other sections
 const whiteboardData = [
@@ -44,6 +46,8 @@ export default function HomeScreen() {
   const router = useRouter();
   const [docsTemplates, setDocsTemplates] = useState<DocTemplate[]>([]);
   const [showTimeGoalPopup, setShowTimeGoalPopup] = useState(false);
+  const { user } = useAuth();
+  const [logoTemplates, setLogoTemplates] = useState<any[]>([]);
 
   useEffect(() => {
     (async () => {
@@ -69,6 +73,43 @@ export default function HomeScreen() {
     };
     
     checkAndShowTimeGoal();
+  }, []);
+
+  useEffect(() => {
+    async function fetchFigmaLogos() {
+      try {
+        // 1. Fetch file structure
+        const res = await fetch(`https://api.figma.com/v1/files/${API_KEYS.FIGMA_FILE2_KEY}`, {
+          headers: { 'X-Figma-Token': API_KEYS.FIGMA_TOKEN }
+        });
+        const data = await res.json();
+        // 2. Collect the first 5 frame nodes
+        const frames = [];
+        for (const page of data.document.children || []) {
+          for (const node of page.children || []) {
+            if (node.type === 'FRAME' && frames.length < 5) {
+              frames.push({ id: node.id, name: node.name });
+            }
+          }
+        }
+        // 3. Fetch image URLs for these frame IDs
+        const ids = frames.map(f => f.id).join(',');
+        const imageRes = await fetch(`https://api.figma.com/v1/images/${API_KEYS.FIGMA_FILE2_KEY}?ids=${ids}&format=png`, {
+          headers: { 'X-Figma-Token': API_KEYS.FIGMA_TOKEN }
+        });
+        const imageData = await imageRes.json();
+        // 4. Map frames to image URLs
+        const logos = frames.map(f => ({
+          id: f.id,
+          label: 'Logo',
+          image: imageData.images[f.id] || ''
+        }));
+        setLogoTemplates(logos);
+      } catch (e) {
+        setLogoTemplates([]);
+      }
+    }
+    fetchFigmaLogos();
   }, []);
 
   const handleTimeGoalClose = async () => {
@@ -151,6 +192,7 @@ export default function HomeScreen() {
           data={socialTemplates} 
           onSeeAll={handleSeeAllStories}
         />
+        <Section title="Logos" data={logoTemplates} />
         <Section title="Docs" data={docsTemplates.map(t => ({ id: t.id, label: t.text ? t.text.slice(0, 20) + (t.text.length > 20 ? '...' : '') : 'Doc', image: '', preview: t.text }))} />
       </ScrollView>
       

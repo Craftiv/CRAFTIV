@@ -68,15 +68,12 @@ export const DesignProvider: React.FC<DesignProviderProps> = ({ children }) => {
       const keys = await AsyncStorage.getAllKeys();
       const designKeys = keys.filter(key => key.startsWith('design_'));
       
-      console.log('Found design keys:', designKeys);
-      
       // Check if any designs exist but are not in recentDesigns
       for (const key of designKeys) {
         const designId = key.replace('design_', '');
         const designExists = recentDesigns.find(design => design.id === designId);
         
         if (!designExists) {
-          console.log('Found orphaned design:', designId);
           // Optionally, we could add it back to recentDesigns or delete it
           // For now, just log it for debugging
         }
@@ -141,10 +138,8 @@ export const DesignProvider: React.FC<DesignProviderProps> = ({ children }) => {
       
       if (designKeys.length > 0) {
         await AsyncStorage.multiRemove(designKeys);
-        console.log('Cleared design content for keys:', designKeys);
       }
       
-      console.log('All design data cleared successfully');
     } catch (error) {
       console.error('Error clearing all design data:', error);
       throw error;

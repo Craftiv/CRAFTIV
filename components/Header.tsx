@@ -3,10 +3,11 @@ import { DrawerActions, useNavigation } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { Alert, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { Alert, StyleSheet, Text, TextInput, TouchableOpacity, View, Image } from 'react-native';
 import { useTheme } from '../contexts/ThemeContext';
 import { useTimerStore } from '../stores/timerStore';
 import TimeGoalPopup from './TimeGoalPopup';
+import { useAuth } from '../contexts/AuthContext';
 
 export default function Header() {
   const { colors, isDark } = useTheme();
@@ -15,6 +16,7 @@ export default function Header() {
   const [showTimeGoalPopup, setShowTimeGoalPopup] = useState(false);
   const navigation = useNavigation();
   const { countdownDuration } = useTimerStore();
+  const { user } = useAuth();
 
   const handleSearch = async () => {
     if (!searchText.trim()) {
@@ -28,7 +30,6 @@ export default function Header() {
       const response = await fetch(`https://jsonplaceholder.typicode.com/posts?title_like=${encodeURIComponent(searchText)}`);
       const data = await response.json();
       
-      console.log('Search results:', data);
       Alert.alert(
         'Search Results', 
         `Found ${data.length} results for "${searchText}"\n\nFirst result: ${data[0]?.title || 'No results'}`
@@ -73,7 +74,13 @@ export default function Header() {
           style={[styles.profileBtn, { backgroundColor: 'transparent' }]}
           onPress={() => router.push('/(drawer)/Profile')}
         >
-          <Ionicons name="person-circle" size={32} color={isDark ? '#6366F1' : '#333'} />
+          {user.profileImage ? (
+            <View style={{ width: 32, height: 32, borderRadius: 16, overflow: 'hidden', backgroundColor: '#ccc' }}>
+              <Image source={{ uri: user.profileImage }} style={{ width: 32, height: 32, borderRadius: 16 }} />
+            </View>
+          ) : (
+            <Ionicons name="person-circle" size={32} color={isDark ? '#6366F1' : '#333'} />
+          )}
         </TouchableOpacity>
       </View>
       <Text style={[styles.title, { color: isDark ? '#fff' : colors.text, backgroundColor: 'transparent' }]}>What will you design today?</Text>

@@ -48,8 +48,6 @@ export const useAIDesignStore = create<AIDesignState>((set, get) => ({
     set({ isLoading: true, error: null });
     
     try {
-      console.log('Starting AI generation with prompt:', prompt);
-      console.log('Using API key:', API_KEYS.DEEPAI_API_KEY ? 'Present' : 'Missing');
       
       // Try alternative DeepAI endpoint and format
       const deepAIResponse = await fetch('https://api.deepai.org/api/text2img', {
@@ -61,23 +59,18 @@ export const useAIDesignStore = create<AIDesignState>((set, get) => ({
         body: `text=${encodeURIComponent(prompt)}`,
       });
       
-      console.log('DeepAI Response status:', deepAIResponse.status);
-      console.log('DeepAI Response headers:', Object.fromEntries(deepAIResponse.headers.entries()));
       
       if (!deepAIResponse.ok) {
         const errorText = await deepAIResponse.text();
-        console.error('DeepAI API error response:', errorText);
         throw new Error(`DeepAI API error: ${deepAIResponse.status} - ${errorText}`);
       }
       
       const deepAIData = await deepAIResponse.json();
-      console.log('DeepAI Response data:', deepAIData);
       
       // Check for different possible response formats
       const imageUrl = deepAIData.output_url || deepAIData.url || deepAIData.id;
       
       if (!imageUrl) {
-        console.error('No image URL in DeepAI response:', deepAIData);
         throw new Error('No image generated from DeepAI - missing image URL');
       }
       
@@ -113,17 +106,10 @@ export const useAIDesignStore = create<AIDesignState>((set, get) => ({
         createdAt: new Date().toISOString(),
       };
       
-      console.log('Successfully generated design:', generatedResult);
       set({ result: generatedResult, isLoading: false });
       return generatedResult;
       
     } catch (error: any) {
-      console.error('AI generation error:', error);
-      console.error('Error details:', {
-        message: error.message,
-        stack: error.stack,
-        name: error.name
-      });
       
       set({ 
         error: error.message || 'Failed to generate design. Please try again.',

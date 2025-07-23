@@ -54,7 +54,7 @@ export default function () {
 
   const sendIdTokenToBackend = async (idToken: string) => {
     try {
-      const backendResponse = await fetch('http://10.132.53.119:8081/api/auth/google', {
+      const backendResponse = await fetch('http://Localhost:8081/api/auth/google', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ idToken }),
@@ -64,7 +64,6 @@ export default function () {
         throw new Error(errorData.message || 'Failed to authenticate with backend');
       }
       const data = await backendResponse.json();
-      console.log('✅ Backend connected: Google login successful response received');
       await AsyncStorage.setItem('userToken', data.token);
       // Clear the time goal popup flag so it shows after login
       await AsyncStorage.removeItem('hasShownTimeGoal');

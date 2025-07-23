@@ -8,11 +8,11 @@ import { useTheme } from '../contexts/ThemeContext';
 export default function CustomDrawerContent(props: any) {
   const router = useRouter();
   const { isDark } = useTheme();
-  const { profileImage } = useAuth();
+  const { user } = useAuth();
 
   // User data (same as Profile.tsx)
-  const userName = 'Mina Torgah';
-  const userUsername = 'mina_torgah';
+  // const userName = 'Mina Torgah';
+  // const userUsername = 'mina_torgah';
 
   // Simple color scheme for both modes
   const backgroundColor = isDark ? '#1a1a1a' : '#ffffff';
@@ -29,8 +29,8 @@ export default function CustomDrawerContent(props: any) {
         <TouchableOpacity style={styles.header} onPress={() => router.push('/(drawer)/Profile')}>
           <View style={styles.profileSection}>
             <View style={styles.avatarContainer}>
-              {profileImage ? (
-                <Image source={{ uri: profileImage }} style={styles.avatar} />
+              {user.profileImage ? (
+                <Image source={{ uri: user.profileImage }} style={styles.avatar} />
               ) : (
                 <View style={styles.avatarPlaceholder}>
                   <Ionicons name="person" size={32} color={iconColor} />
@@ -38,8 +38,8 @@ export default function CustomDrawerContent(props: any) {
               )}
             </View>
             <View style={styles.userInfo}>
-              <Text style={[styles.userName, { color: textColor }]}>{userName}</Text>
-              <Text style={[styles.userUsername, { color: textColor, opacity: 0.7 }]}>@{userUsername}</Text>
+              <Text style={[styles.userName, { color: textColor }]}>{user.name || 'Your Name'}</Text>
+              <Text style={[styles.userUsername, { color: textColor, opacity: 0.7 }]}>@{user.username || 'username'}</Text>
             </View>
           </View>
         </TouchableOpacity>

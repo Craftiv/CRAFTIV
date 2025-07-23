@@ -6,13 +6,17 @@ import {
     Switch,
     Text,
     TouchableOpacity,
-    View
+    View,
+    Image
 } from 'react-native';
 import { useTheme } from '../../../contexts/ThemeContext';
+import { useAuth } from '../../../contexts/AuthContext';
 
 export default function SettingsScreen() {
   const { colors, isDark, toggleTheme } = useTheme();
   const router = useRouter();
+  const { user } = useAuth();
+  console.log('Settings user:', user);
 
   const settingsSections = [
     {
@@ -273,10 +277,14 @@ export default function SettingsScreen() {
 
       <View style={styles.profileSection}>
         <View style={styles.profileAvatar}>
-          <Ionicons name="person" size={40} color="white" />
+          {user.profileImage ? (
+            <Image source={{ uri: user.profileImage }} style={{ width: 80, height: 80, borderRadius: 40 }} />
+          ) : (
+            <Ionicons name="person" size={40} color="white" />
+          )}
         </View>
-        <Text style={styles.profileName}>John Doe</Text>
-        <Text style={styles.profileEmail}>john.doe@example.com</Text>
+        <Text style={styles.profileName}>{user.name || 'Your Name'}</Text>
+        <Text style={styles.profileEmail}>{user.email || 'your@email.com'}</Text>
         <TouchableOpacity style={styles.editProfileButton} onPress={() => router.push('/(drawer)/Profile')}>
           <Text style={styles.editProfileText}>Edit Profile</Text>
         </TouchableOpacity>

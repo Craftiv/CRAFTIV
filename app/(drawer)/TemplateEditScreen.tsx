@@ -19,6 +19,7 @@ import {
 } from 'react-native';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useDesignStore } from '../../stores/designStore';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 type IoniconsName = React.ComponentProps<typeof Ionicons>["name"];
 
@@ -32,9 +33,9 @@ const FONT_FAMILIES: string[] = ['System', 'Arial', 'Helvetica', 'Times New Roma
 
 const screenWidth = Dimensions.get('window').width;
 const screenHeight = Dimensions.get('window').height;
-// Default canvas size - will be overridden by template dimensions
-const CANVAS_SIZE = Math.min(screenWidth * 0.95, 500);
-const CANVAS_HEIGHT = Math.min(screenHeight * 0.6, 600);
+// Set fixed canvas size (Instagram Story)
+const CANVAS_WIDTH = 1080;
+const CANVAS_HEIGHT = 1920;
 
 const SHAPE_OPTIONS = [
   { type: 'rectangle', label: 'Rectangle', icon: 'square-outline' },
@@ -99,7 +100,7 @@ const ResizeHandle = ({ x, y, onResize, style, type }: {
   );
 };
 
-const ShapeOnCanvas = ({ shape, selected, onPress, draggable, updatePosition, canvasLayout, updateSize }: {
+const ShapeOnCanvas = ({ shape, selected, onPress, draggable, updatePosition, canvasLayout, updateSize, scaleFactor = 1 }: {
   shape: any;
   selected?: boolean;
   onPress?: (e?: GestureResponderEvent) => void;
@@ -107,6 +108,7 @@ const ShapeOnCanvas = ({ shape, selected, onPress, draggable, updatePosition, ca
   updatePosition?: (x: number, y: number) => void;
   canvasLayout?: { x: number; y: number; width: number; height: number };
   updateSize?: (id: string, newWidth: number, newHeight: number, newX: number, newY: number) => void;
+  scaleFactor?: number;
 }) => {
   const pan = React.useRef(new Animated.ValueXY({ x: shape.x, y: shape.y })).current;
   const panOffset = React.useRef({ x: shape.x, y: shape.y });
@@ -135,6 +137,7 @@ const ShapeOnCanvas = ({ shape, selected, onPress, draggable, updatePosition, ca
       onPanResponderGrant: (evt: GestureResponderEvent) => {
         if (onPress) onPress(evt);
         isDragging.current = true;
+        // Use the actual touch position, not the scaled data
         panOffset.current = { x: shape.x, y: shape.y };
       },
       onPanResponderMove: (e: GestureResponderEvent, gesture) => {
@@ -153,7 +156,8 @@ const ShapeOnCanvas = ({ shape, selected, onPress, draggable, updatePosition, ca
         newY = Math.max(0, Math.min(newY, canvasLayout.height - (shape.height || 60)));
         pan.setValue({ x: newX, y: newY });
         panOffset.current = { x: newX, y: newY };
-        updatePosition && updatePosition(newX, newY);
+        // Convert back to unscaled coordinates for data
+        updatePosition && updatePosition(newX / scaleFactor, newY / scaleFactor);
         isDragging.current = false;
       },
     })
@@ -262,7 +266,7 @@ const ShapeOnCanvas = ({ shape, selected, onPress, draggable, updatePosition, ca
   );
 };
 
-const TextOnCanvas = ({ textObj, selected, onPress, draggable, updatePosition, canvasLayout, onDoubleTap }: {
+const TextOnCanvas = ({ textObj, selected, onPress, draggable, updatePosition, canvasLayout, onDoubleTap, scaleFactor = 1 }: {
   textObj: any;
   selected?: boolean;
   onPress?: (e?: GestureResponderEvent) => void;
@@ -270,6 +274,7 @@ const TextOnCanvas = ({ textObj, selected, onPress, draggable, updatePosition, c
   updatePosition?: (x: number, y: number) => void;
   canvasLayout?: { x: number; y: number; width: number; height: number };
   onDoubleTap?: () => void;
+  scaleFactor?: number;
 }) => {
   const pan = React.useRef(new Animated.ValueXY({ x: textObj.x, y: textObj.y })).current;
   const panOffset = React.useRef({ x: textObj.x, y: textObj.y });
@@ -298,6 +303,7 @@ const TextOnCanvas = ({ textObj, selected, onPress, draggable, updatePosition, c
       onPanResponderGrant: (evt: GestureResponderEvent) => {
         if (onPress) onPress(evt);
         isDragging.current = true;
+        // Use the actual touch position, not the scaled data
         panOffset.current = { x: textObj.x, y: textObj.y };
       },
       onPanResponderMove: (e: GestureResponderEvent, gesture) => {
@@ -316,7 +322,8 @@ const TextOnCanvas = ({ textObj, selected, onPress, draggable, updatePosition, c
         newY = Math.max(0, Math.min(newY, canvasLayout.height - 30));
         pan.setValue({ x: newX, y: newY });
         panOffset.current = { x: newX, y: newY };
-        updatePosition && updatePosition(newX, newY);
+        // Convert back to unscaled coordinates for data
+        updatePosition && updatePosition(newX / scaleFactor, newY / scaleFactor);
         isDragging.current = false;
       },
     })
@@ -349,7 +356,7 @@ const TextOnCanvas = ({ textObj, selected, onPress, draggable, updatePosition, c
   );
 };
 
-const ImageOnCanvas = ({ image, selected, onPress, draggable, updatePosition, canvasLayout, updateSize }: {
+const ImageOnCanvas = ({ image, selected, onPress, draggable, updatePosition, canvasLayout, updateSize, scaleFactor = 1 }: {
   image: any;
   selected?: boolean;
   onPress?: (e?: GestureResponderEvent) => void;
@@ -357,6 +364,7 @@ const ImageOnCanvas = ({ image, selected, onPress, draggable, updatePosition, ca
   updatePosition?: (x: number, y: number) => void;
   canvasLayout?: { x: number; y: number; width: number; height: number };
   updateSize?: (id: string, newWidth: number, newHeight: number, newX: number, newY: number) => void;
+  scaleFactor?: number;
 }) => {
   const pan = React.useRef(new Animated.ValueXY({ x: image.x, y: image.y })).current;
   const panOffset = React.useRef({ x: image.x, y: image.y });
@@ -385,6 +393,7 @@ const ImageOnCanvas = ({ image, selected, onPress, draggable, updatePosition, ca
       onPanResponderGrant: (evt: GestureResponderEvent) => {
         if (onPress) onPress(evt);
         isDragging.current = true;
+        // Use the actual touch position, not the scaled data
         panOffset.current = { x: image.x, y: image.y };
       },
       onPanResponderMove: (e: GestureResponderEvent, gesture) => {
@@ -403,7 +412,8 @@ const ImageOnCanvas = ({ image, selected, onPress, draggable, updatePosition, ca
         newY = Math.max(0, Math.min(newY, canvasLayout.height - (image.height || 60)));
         pan.setValue({ x: newX, y: newY });
         panOffset.current = { x: newX, y: newY };
-        updatePosition && updatePosition(newX, newY);
+        // Convert back to unscaled coordinates for data
+        updatePosition && updatePosition(newX / scaleFactor, newY / scaleFactor);
         isDragging.current = false;
       },
     })
@@ -694,82 +704,41 @@ const TemplateEditScreen = () => {
   const handleSaveTemplate = async () => {
     try {
       await designStore.saveDesign();
+      // Save to YourStories
+      const story = {
+        id: `${Date.now()}`,
+        title: templateName,
+        imageUri: '', // Placeholder, ideally generate a preview image
+        date: new Date().toISOString(),
+        designData: {
+          elements: designStore.elements,
+          canvasBgColor: designStore.canvasBackgroundColor,
+        },
+      };
+      // Load existing stories
+      const existing = await AsyncStorage.getItem('yourStories');
+      let stories = [];
+      if (existing) {
+        stories = JSON.parse(existing);
+      }
+      stories.unshift(story); // Add new story to the front
+      await AsyncStorage.setItem('yourStories', JSON.stringify(stories));
       Alert.alert('Success', 'Template saved successfully!');
+      // Navigate to YourStories
+      router.replace('/(drawer)/YourStories');
     } catch (error) {
       Alert.alert('Error', 'Failed to save template');
     }
   };
 
-  // Calculate canvas dimensions based on template or use defaults
-  const getCanvasDimensions = () => {
-    // If we have elements, calculate the canvas size based on the template
-    if (elements.length > 0) {
-      // Find the maximum bounds of all elements
-      let maxX = 0, maxY = 0;
-      elements.forEach(element => {
-        const elementRight = element.x + (element.width || 60);
-        const elementBottom = element.y + (element.height || 40);
-        maxX = Math.max(maxX, elementRight);
-        maxY = Math.max(maxY, elementBottom);
-      });
-      
-      // Add some padding and ensure minimum size
-      const templateWidth = Math.max(maxX + 40, 420); // Default template width
-      const templateHeight = Math.max(maxY + 40, 483); // Default template height
-      
-      // Scale to fit screen while maintaining aspect ratio
-      const maxWidth = screenWidth * 0.95;
-      const maxHeight = screenHeight * 0.6;
-      const scaleX = maxWidth / templateWidth;
-      const scaleY = maxHeight / templateHeight;
-      const scale = Math.min(scaleX, scaleY, 1); // Don't scale up, only down
-      
-      return {
-        width: templateWidth * scale,
-        height: templateHeight * scale,
-      };
-    }
-    
-    // Default dimensions
-    return {
-      width: CANVAS_SIZE,
-      height: CANVAS_HEIGHT,
-    };
-  };
-
-  const canvasDimensions = getCanvasDimensions();
-  
-  // Calculate scaling factor for elements
-  const getScaleFactor = () => {
-    if (elements.length > 0) {
-      // Find the maximum bounds of all elements
-      let maxX = 0, maxY = 0;
-      elements.forEach(element => {
-        const elementRight = element.x + (element.width || 60);
-        const elementBottom = element.y + (element.height || 40);
-        maxX = Math.max(maxX, elementRight);
-        maxY = Math.max(maxY, elementBottom);
-      });
-      
-      const templateWidth = Math.max(maxX + 40, 420);
-      const templateHeight = Math.max(maxY + 40, 483);
-      
-      const maxWidth = screenWidth * 0.95;
-      const maxHeight = screenHeight * 0.6;
-      const scaleX = maxWidth / templateWidth;
-      const scaleY = maxHeight / templateHeight;
-      return Math.min(scaleX, scaleY, 1);
-    }
-    return 1;
-  };
-  
-  const scaleFactor = getScaleFactor();
-  
+  // Replace getCanvasDimensions and scaleFactor logic with fixed size
+  const canvasDimensions = { width: CANVAS_WIDTH, height: CANVAS_HEIGHT };
+  const scaleFactor = 1;
   const canvasLayout = {
     x: 0,
     y: 0,
-    width: canvasDimensions.width,
-    height: canvasDimensions.height,
+    width: CANVAS_WIDTH,
+    height: CANVAS_HEIGHT,
   };
 
   return (
@@ -832,16 +801,10 @@ const TemplateEditScreen = () => {
             </View>
           )}
           {elements.map((element) => {
-            // Scale the element properties for display
             const scaledElement = {
               ...element,
-              x: element.x * scaleFactor,
-              y: element.y * scaleFactor,
-              width: (element.width || 60) * scaleFactor,
-              height: (element.height || 40) * scaleFactor,
-              ...(element.type === 'text' && { fontSize: (element.fontSize || 16) * scaleFactor }),
+              // No scaling needed
             };
-            
             if (element.type === 'rectangle' || element.type === 'circle') {
               return (
                 <ShapeOnCanvas
@@ -850,9 +813,10 @@ const TemplateEditScreen = () => {
                   selected={selectedElements.includes(element.id)}
                   onPress={() => handleShapePress(element.id, undefined)}
                   draggable={true}
-                  updatePosition={(x, y) => updateShapePosition(element.id, x / scaleFactor, y / scaleFactor)}
+                  updatePosition={(x, y) => updateShapePosition(element.id, x, y)}
+                  scaleFactor={1}
                   canvasLayout={canvasLayout}
-                  updateSize={(id, width, height, x, y) => updateShapeSize(element.id, width / scaleFactor, height / scaleFactor, x / scaleFactor, y / scaleFactor)}
+                  updateSize={(id, width, height, x, y) => updateShapeSize(element.id, width, height, x, y)}
                 />
               );
             } else if (element.type === 'text') {
@@ -863,7 +827,8 @@ const TemplateEditScreen = () => {
                   selected={selectedElements.includes(element.id)}
                   onPress={() => handleTextPress(element.id, undefined)}
                   draggable={true}
-                  updatePosition={(x, y) => updateTextPosition(element.id, x / scaleFactor, y / scaleFactor)}
+                  updatePosition={(x, y) => updateTextPosition(element.id, x, y)}
+                  scaleFactor={1}
                   canvasLayout={canvasLayout}
                 />
               );
@@ -875,9 +840,10 @@ const TemplateEditScreen = () => {
                   selected={selectedElements.includes(element.id)}
                   onPress={() => handleImagePress(element.id, undefined)}
                   draggable={true}
-                  updatePosition={(x, y) => updateImagePosition(element.id, x / scaleFactor, y / scaleFactor)}
+                  updatePosition={(x, y) => updateImagePosition(element.id, x, y)}
+                  scaleFactor={1}
                   canvasLayout={canvasLayout}
-                  updateSize={(id, width, height, x, y) => updateImageSize(element.id, width / scaleFactor, height / scaleFactor, x / scaleFactor, y / scaleFactor)}
+                  updateSize={(id, width, height, x, y) => updateImageSize(element.id, width, height, x, y)}
                 />
               );
             }

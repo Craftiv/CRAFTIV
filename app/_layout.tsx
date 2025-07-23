@@ -4,10 +4,10 @@ import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native
 import { useFonts as useExpoFonts } from 'expo-font';
 import { Stack } from 'expo-router/stack';
 import { StatusBar } from 'expo-status-bar';
-// import { AuthProvider, useAuth } from '../contexts/AuthContext';
 import { useEffect, useState } from 'react';
 import { DesignProvider } from '../contexts/DesignContext';
 import { ThemeProvider as CustomThemeProvider } from '../contexts/ThemeContext';
+import { AuthProvider } from '../contexts/AuthContext';
 
 function RootStack() {
   const colorScheme = useColorScheme();
@@ -74,10 +74,9 @@ function RootStack() {
 }
 
 export default function AppLayout() {
-  // return (
-  //   <AuthProvider>
-  //     <RootStack />
-  //   </AuthProvider>
-  // );
-  return <RootStack />;
+  return (
+    <AuthProvider>
+      <RootStack />
+    </AuthProvider>
+  );
 }
