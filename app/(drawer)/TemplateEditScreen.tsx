@@ -1,25 +1,27 @@
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
+import * as MediaLibrary from 'expo-media-library';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
-    Alert,
-    Animated,
-    Dimensions,
-    GestureResponderEvent,
-    Image,
-    Modal,
-    PanResponder,
-    StatusBar,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View
+  Alert,
+  Animated,
+  Dimensions,
+  GestureResponderEvent,
+  Image,
+  Modal,
+  PanResponder,
+  StatusBar,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View
 } from 'react-native';
+import ViewShot, { captureRef } from 'react-native-view-shot';
+import { useDesigns } from '../../contexts/DesignContext';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useDesignStore } from '../../stores/designStore';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 
 type IoniconsName = React.ComponentProps<typeof Ionicons>["name"];
 
@@ -33,9 +35,9 @@ const FONT_FAMILIES: string[] = ['System', 'Arial', 'Helvetica', 'Times New Roma
 
 const screenWidth = Dimensions.get('window').width;
 const screenHeight = Dimensions.get('window').height;
-// Set fixed canvas size (Instagram Story)
-const CANVAS_WIDTH = 1080;
-const CANVAS_HEIGHT = 1920;
+// Default canvas size - will be overridden by template dimensions
+const CANVAS_SIZE = Math.min(screenWidth * 0.95, 500);
+const CANVAS_HEIGHT = Math.min(screenHeight * 0.6, 600);
 
 const SHAPE_OPTIONS = [
   { type: 'rectangle', label: 'Rectangle', icon: 'square-outline' },
@@ -100,7 +102,7 @@ const ResizeHandle = ({ x, y, onResize, style, type }: {
   );
 };
 
-const ShapeOnCanvas = ({ shape, selected, onPress, draggable, updatePosition, canvasLayout, updateSize, scaleFactor = 1 }: {
+const ShapeOnCanvas = ({ shape, selected, onPress, draggable, updatePosition, canvasLayout, updateSize }: {
   shape: any;
   selected?: boolean;
   onPress?: (e?: GestureResponderEvent) => void;
@@ -108,7 +110,6 @@ const ShapeOnCanvas = ({ shape, selected, onPress, draggable, updatePosition, ca
   updatePosition?: (x: number, y: number) => void;
   canvasLayout?: { x: number; y: number; width: number; height: number };
   updateSize?: (id: string, newWidth: number, newHeight: number, newX: number, newY: number) => void;
-  scaleFactor?: number;
 }) => {
   const pan = React.useRef(new Animated.ValueXY({ x: shape.x, y: shape.y })).current;
   const panOffset = React.useRef({ x: shape.x, y: shape.y });
@@ -137,7 +138,6 @@ const ShapeOnCanvas = ({ shape, selected, onPress, draggable, updatePosition, ca
       onPanResponderGrant: (evt: GestureResponderEvent) => {
         if (onPress) onPress(evt);
         isDragging.current = true;
-        // Use the actual touch position, not the scaled data
         panOffset.current = { x: shape.x, y: shape.y };
       },
       onPanResponderMove: (e: GestureResponderEvent, gesture) => {
@@ -156,8 +156,7 @@ const ShapeOnCanvas = ({ shape, selected, onPress, draggable, updatePosition, ca
         newY = Math.max(0, Math.min(newY, canvasLayout.height - (shape.height || 60)));
         pan.setValue({ x: newX, y: newY });
         panOffset.current = { x: newX, y: newY };
-        // Convert back to unscaled coordinates for data
-        updatePosition && updatePosition(newX / scaleFactor, newY / scaleFactor);
+        updatePosition && updatePosition(newX, newY);
         isDragging.current = false;
       },
     })
@@ -266,7 +265,7 @@ const ShapeOnCanvas = ({ shape, selected, onPress, draggable, updatePosition, ca
   );
 };
 
-const TextOnCanvas = ({ textObj, selected, onPress, draggable, updatePosition, canvasLayout, onDoubleTap, scaleFactor = 1 }: {
+const TextOnCanvas = ({ textObj, selected, onPress, draggable, updatePosition, canvasLayout, onDoubleTap }: {
   textObj: any;
   selected?: boolean;
   onPress?: (e?: GestureResponderEvent) => void;
@@ -274,7 +273,6 @@ const TextOnCanvas = ({ textObj, selected, onPress, draggable, updatePosition, c
   updatePosition?: (x: number, y: number) => void;
   canvasLayout?: { x: number; y: number; width: number; height: number };
   onDoubleTap?: () => void;
-  scaleFactor?: number;
 }) => {
   const pan = React.useRef(new Animated.ValueXY({ x: textObj.x, y: textObj.y })).current;
   const panOffset = React.useRef({ x: textObj.x, y: textObj.y });
@@ -303,7 +301,6 @@ const TextOnCanvas = ({ textObj, selected, onPress, draggable, updatePosition, c
       onPanResponderGrant: (evt: GestureResponderEvent) => {
         if (onPress) onPress(evt);
         isDragging.current = true;
-        // Use the actual touch position, not the scaled data
         panOffset.current = { x: textObj.x, y: textObj.y };
       },
       onPanResponderMove: (e: GestureResponderEvent, gesture) => {
@@ -322,8 +319,7 @@ const TextOnCanvas = ({ textObj, selected, onPress, draggable, updatePosition, c
         newY = Math.max(0, Math.min(newY, canvasLayout.height - 30));
         pan.setValue({ x: newX, y: newY });
         panOffset.current = { x: newX, y: newY };
-        // Convert back to unscaled coordinates for data
-        updatePosition && updatePosition(newX / scaleFactor, newY / scaleFactor);
+        updatePosition && updatePosition(newX, newY);
         isDragging.current = false;
       },
     })
@@ -356,7 +352,7 @@ const TextOnCanvas = ({ textObj, selected, onPress, draggable, updatePosition, c
   );
 };
 
-const ImageOnCanvas = ({ image, selected, onPress, draggable, updatePosition, canvasLayout, updateSize, scaleFactor = 1 }: {
+const ImageOnCanvas = ({ image, selected, onPress, draggable, updatePosition, canvasLayout, updateSize }: {
   image: any;
   selected?: boolean;
   onPress?: (e?: GestureResponderEvent) => void;
@@ -364,23 +360,17 @@ const ImageOnCanvas = ({ image, selected, onPress, draggable, updatePosition, ca
   updatePosition?: (x: number, y: number) => void;
   canvasLayout?: { x: number; y: number; width: number; height: number };
   updateSize?: (id: string, newWidth: number, newHeight: number, newX: number, newY: number) => void;
-  scaleFactor?: number;
 }) => {
   const pan = React.useRef(new Animated.ValueXY({ x: image.x, y: image.y })).current;
   const panOffset = React.useRef({ x: image.x, y: image.y });
   const isDragging = React.useRef(false);
   
   React.useEffect(() => {
-    // Don't update position if we're currently dragging
     if (isDragging.current) return;
-    
-    // Only update if the position has actually changed significantly
     const currentX = panOffset.current.x;
     const currentY = panOffset.current.y;
     const newX = image.x;
     const newY = image.y;
-    
-    // Only update if the difference is more than 1 pixel to avoid floating point issues
     if (Math.abs(currentX - newX) > 1 || Math.abs(currentY - newY) > 1) {
       pan.setValue({ x: newX, y: newY });
       panOffset.current = { x: newX, y: newY };
@@ -393,7 +383,6 @@ const ImageOnCanvas = ({ image, selected, onPress, draggable, updatePosition, ca
       onPanResponderGrant: (evt: GestureResponderEvent) => {
         if (onPress) onPress(evt);
         isDragging.current = true;
-        // Use the actual touch position, not the scaled data
         panOffset.current = { x: image.x, y: image.y };
       },
       onPanResponderMove: (e: GestureResponderEvent, gesture) => {
@@ -412,18 +401,17 @@ const ImageOnCanvas = ({ image, selected, onPress, draggable, updatePosition, ca
         newY = Math.max(0, Math.min(newY, canvasLayout.height - (image.height || 60)));
         pan.setValue({ x: newX, y: newY });
         panOffset.current = { x: newX, y: newY };
-        // Convert back to unscaled coordinates for data
-        updatePosition && updatePosition(newX / scaleFactor, newY / scaleFactor);
+        updatePosition && updatePosition(newX, newY);
         isDragging.current = false;
       },
     })
   ).current;
 
+  // Enhanced handleResize for all sides and corners
   const handleResize = (handle: string, dx: number, dy: number) => {
     if (!updateSize || !canvasLayout) return;
     let { x, y, width, height } = image;
     let newX = x, newY = y, newW = width, newH = height;
-    
     switch (handle) {
       case 'topLeft':
         newX = x + dx;
@@ -445,8 +433,21 @@ const ImageOnCanvas = ({ image, selected, onPress, draggable, updatePosition, ca
         newW = width - dx;
         newH = height + dy;
         break;
+      case 'top':
+        newY = y + dy;
+        newH = height - dy;
+        break;
+      case 'right':
+        newW = width + dx;
+        break;
+      case 'bottom':
+        newH = height + dy;
+        break;
+      case 'left':
+        newX = x + dx;
+        newW = width - dx;
+        break;
     }
-    
     newW = Math.max(30, Math.min(newW, canvasLayout.width - newX));
     newH = Math.max(30, Math.min(newH, canvasLayout.height - newY));
     newX = Math.max(0, Math.min(newX, canvasLayout.width - newW));
@@ -465,6 +466,8 @@ const ImageOnCanvas = ({ image, selected, onPress, draggable, updatePosition, ca
         borderRadius: 8,
         backgroundColor: selected ? 'rgba(0, 122, 255, 0.1)' : 'transparent',
         transform: pan.getTranslateTransform(),
+        width: image.width,
+        height: image.height,
       }}
     >
       <Image 
@@ -472,13 +475,24 @@ const ImageOnCanvas = ({ image, selected, onPress, draggable, updatePosition, ca
         style={{ width: image.width, height: image.height, borderRadius: 8 }} 
         resizeMode="contain" 
       />
-      {selected && ['topLeft', 'topRight', 'bottomRight', 'bottomLeft'].map((handle) => (
+      {selected && [
+        // Corners
+        { handle: 'topLeft', x: 0, y: 0 },
+        { handle: 'topRight', x: image.width, y: 0 },
+        { handle: 'bottomRight', x: image.width, y: image.height },
+        { handle: 'bottomLeft', x: 0, y: image.height },
+        // Sides
+        { handle: 'top', x: image.width / 2, y: 0 },
+        { handle: 'right', x: image.width, y: image.height / 2 },
+        { handle: 'bottom', x: image.width / 2, y: image.height },
+        { handle: 'left', x: 0, y: image.height / 2 },
+      ].map(({ handle, x, y }) => (
         <ResizeHandle
           key={handle}
-          x={handle.includes('Right') ? (image.width || 60) : 0}
-          y={handle.includes('bottom') ? (image.height || 40) : 0}
+          x={x}
+          y={y}
           onResize={(dx, dy) => handleResize(handle, dx, dy)}
-          type="corner"
+          type={['top', 'right', 'bottom', 'left'].includes(handle) ? 'side' : 'corner'}
         />
       ))}
     </Animated.View>
@@ -490,6 +504,7 @@ const TemplateEditScreen = () => {
   const router = useRouter();
   const { colors, isDark } = useTheme();
   const designStore = useDesignStore();
+  const { addDesign } = useDesigns();
   
   const [selectedShape, setSelectedShape] = useState<string | null>(null);
   const [selectedText, setSelectedText] = useState<string | null>(null);
@@ -505,6 +520,7 @@ const TemplateEditScreen = () => {
   const [noteText, setNoteText] = useState('');
   const [templateName, setTemplateName] = useState('Template Edit');
   const ignoreNextCanvasPress = React.useRef(false);
+  const viewShotRef = useRef(null);
 
   const elements = designStore.elements;
   const selectedElements = designStore.selectedElements;
@@ -514,6 +530,18 @@ const TemplateEditScreen = () => {
     // Set template name from params if available
     if (params.templateName) {
       setTemplateName(params.templateName as string);
+    }
+    // Load elements and canvas background color if editing a recent design
+    if (params.elements && designStore.elements.length === 0) {
+      try {
+        const parsedElements = JSON.parse(params.elements as string);
+        designStore.setElements(parsedElements);
+      } catch (e) {
+        // ignore
+      }
+    }
+    if (params.canvasBgColor && designStore.elements.length === 0) {
+      designStore.setCanvasBackgroundColor(params.canvasBgColor as string);
     }
   }, [params]);
 
@@ -704,41 +732,99 @@ const TemplateEditScreen = () => {
   const handleSaveTemplate = async () => {
     try {
       await designStore.saveDesign();
-      // Save to YourStories
-      const story = {
-        id: `${Date.now()}`,
-        title: templateName,
-        imageUri: '', // Placeholder, ideally generate a preview image
-        date: new Date().toISOString(),
-        designData: {
-          elements: designStore.elements,
-          canvasBgColor: designStore.canvasBackgroundColor,
-        },
-      };
-      // Load existing stories
-      const existing = await AsyncStorage.getItem('yourStories');
-      let stories = [];
-      if (existing) {
-        stories = JSON.parse(existing);
+      // Add to recent designs for homepage
+      const firstImage = elements.find(e => e.type === 'image');
+      addDesign({
+        label: templateName,
+        image: firstImage?.uri || 'https://placehold.co/100x150?text=Design',
+        isCompleted: false,
+        elements: elements,
+        canvasBackgroundColor: canvasBackgroundColor,
+      });
+      // Save to gallery
+      const { status } = await MediaLibrary.requestPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Permission required', 'Please grant gallery permission to save the design.');
+        return;
       }
-      stories.unshift(story); // Add new story to the front
-      await AsyncStorage.setItem('yourStories', JSON.stringify(stories));
-      Alert.alert('Success', 'Template saved successfully!');
-      // Navigate to YourStories
-      router.replace('/(drawer)/YourStories');
+      const uri = await captureRef(viewShotRef, { format: 'png', quality: 1 });
+      await MediaLibrary.saveToLibraryAsync(uri);
+      Alert.alert('Success', 'Template saved successfully and added to your gallery!');
     } catch (error) {
-      Alert.alert('Error', 'Failed to save template');
+      Alert.alert('Error', 'Failed to save template or add to gallery');
     }
   };
 
-  // Replace getCanvasDimensions and scaleFactor logic with fixed size
-  const canvasDimensions = { width: CANVAS_WIDTH, height: CANVAS_HEIGHT };
-  const scaleFactor = 1;
+  // Calculate canvas dimensions based on template or use defaults
+  const getCanvasDimensions = () => {
+    // If we have elements, calculate the canvas size based on the template
+    if (elements.length > 0) {
+      // Find the maximum bounds of all elements
+      let maxX = 0, maxY = 0;
+      elements.forEach(element => {
+        const elementRight = element.x + (element.width || 60);
+        const elementBottom = element.y + (element.height || 40);
+        maxX = Math.max(maxX, elementRight);
+        maxY = Math.max(maxY, elementBottom);
+      });
+      
+      // Add some padding and ensure minimum size
+      const templateWidth = Math.max(maxX + 40, 420); // Default template width
+      const templateHeight = Math.max(maxY + 40, 483); // Default template height
+      
+      // Scale to fit screen while maintaining aspect ratio
+      const maxWidth = screenWidth * 0.95;
+      const maxHeight = screenHeight * 0.6;
+      const scaleX = maxWidth / templateWidth;
+      const scaleY = maxHeight / templateHeight;
+      const scale = Math.min(scaleX, scaleY, 1); // Don't scale up, only down
+      
+      return {
+        width: templateWidth * scale,
+        height: templateHeight * scale,
+      };
+    }
+    
+    // Default dimensions
+    return {
+      width: CANVAS_SIZE,
+      height: CANVAS_HEIGHT,
+    };
+  };
+
+  const canvasDimensions = getCanvasDimensions();
+  
+  // Calculate scaling factor for elements
+  const getScaleFactor = () => {
+    if (elements.length > 0) {
+      // Find the maximum bounds of all elements
+      let maxX = 0, maxY = 0;
+      elements.forEach(element => {
+        const elementRight = element.x + (element.width || 60);
+        const elementBottom = element.y + (element.height || 40);
+        maxX = Math.max(maxX, elementRight);
+        maxY = Math.max(maxY, elementBottom);
+      });
+      
+      const templateWidth = Math.max(maxX + 40, 420);
+      const templateHeight = Math.max(maxY + 40, 483);
+      
+      const maxWidth = screenWidth * 0.95;
+      const maxHeight = screenHeight * 0.6;
+      const scaleX = maxWidth / templateWidth;
+      const scaleY = maxHeight / templateHeight;
+      return Math.min(scaleX, scaleY, 1);
+    }
+    return 1;
+  };
+  
+  const scaleFactor = getScaleFactor();
+  
   const canvasLayout = {
     x: 0,
     y: 0,
-    width: CANVAS_WIDTH,
-    height: CANVAS_HEIGHT,
+    width: canvasDimensions.width,
+    height: canvasDimensions.height,
   };
 
   return (
@@ -771,85 +857,111 @@ const TemplateEditScreen = () => {
         </TouchableOpacity>
       </View>
 
+      {selectedImage && (
+        <View style={{ alignItems: 'center', marginVertical: 8 }}>
+          <TouchableOpacity
+            style={{ backgroundColor: '#6366F1', paddingVertical: 8, paddingHorizontal: 20, borderRadius: 8 }}
+            onPress={async () => {
+              const result = await ImagePicker.launchImageLibraryAsync({
+                mediaTypes: ImagePicker.MediaTypeOptions.Images,
+                allowsEditing: true,
+                aspect: [1, 1],
+                quality: 1,
+              });
+              if (!result.canceled && result.assets[0]) {
+                designStore.updateElement(selectedImage, { uri: result.assets[0].uri });
+              }
+            }}
+          >
+            <Text style={{ color: '#fff', fontWeight: 'bold' }}>Replace Image</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
       {/* Canvas */}
       <View style={styles.canvasContainer}>
-        <View
-          style={[
-            styles.canvas,
-            {
-              backgroundColor: canvasBackgroundColor,
-              width: canvasDimensions.width,
-              height: canvasDimensions.height,
-              borderWidth: 2,
-              borderColor: '#E0E0E0',
-              borderRadius: 8,
-              shadowColor: '#000',
-              shadowOffset: { width: 0, height: 2 },
-              shadowOpacity: 0.1,
-              shadowRadius: 4,
-              elevation: 3,
-            },
-          ]}
-          onTouchEnd={handleCanvasPress}
-        >
-          {/* Selection indicator */}
-          {(selectedShape || selectedText || selectedImage) && (
-            <View style={styles.selectionIndicator}>
-              <Text style={styles.selectionText}>
-                {selectedShape ? 'Shape Selected' : selectedText ? 'Text Selected' : 'Image Selected'}
-              </Text>
-            </View>
-          )}
-          {elements.map((element) => {
-            const scaledElement = {
-              ...element,
-              // No scaling needed
-            };
-            if (element.type === 'rectangle' || element.type === 'circle') {
-              return (
-                <ShapeOnCanvas
-                  key={element.id}
-                  shape={scaledElement}
-                  selected={selectedElements.includes(element.id)}
-                  onPress={() => handleShapePress(element.id, undefined)}
-                  draggable={true}
-                  updatePosition={(x, y) => updateShapePosition(element.id, x, y)}
-                  scaleFactor={1}
-                  canvasLayout={canvasLayout}
-                  updateSize={(id, width, height, x, y) => updateShapeSize(element.id, width, height, x, y)}
-                />
-              );
-            } else if (element.type === 'text') {
-              return (
-                <TextOnCanvas
-                  key={element.id}
-                  textObj={scaledElement}
-                  selected={selectedElements.includes(element.id)}
-                  onPress={() => handleTextPress(element.id, undefined)}
-                  draggable={true}
-                  updatePosition={(x, y) => updateTextPosition(element.id, x, y)}
-                  scaleFactor={1}
-                  canvasLayout={canvasLayout}
-                />
-              );
-            } else if (element.type === 'image') {
-              return (
-                <ImageOnCanvas
-                  key={element.id}
-                  image={scaledElement}
-                  selected={selectedElements.includes(element.id)}
-                  onPress={() => handleImagePress(element.id, undefined)}
-                  draggable={true}
-                  updatePosition={(x, y) => updateImagePosition(element.id, x, y)}
-                  scaleFactor={1}
-                  canvasLayout={canvasLayout}
-                  updateSize={(id, width, height, x, y) => updateImageSize(element.id, width, height, x, y)}
-                />
-              );
-            }
-            return null;
-          })}
-        </View>
+        <ViewShot ref={viewShotRef} options={{ format: 'png', quality: 1 }} style={{ alignItems: 'center', justifyContent: 'center' }}>
+          <View
+            style={[
+              styles.canvas,
+              {
+                backgroundColor: canvasBackgroundColor,
+                width: canvasDimensions.width,
+                height: canvasDimensions.height,
+                borderWidth: 2,
+                borderColor: '#E0E0E0',
+                borderRadius: 8,
+                shadowColor: '#000',
+                shadowOffset: { width: 0, height: 2 },
+                shadowOpacity: 0.1,
+                shadowRadius: 4,
+                elevation: 3,
+              },
+            ]}
+            onTouchEnd={handleCanvasPress}
+          >
+            {/* Selection indicator */}
+            {(selectedShape || selectedText || selectedImage) && (
+              <View style={styles.selectionIndicator}>
+                <Text style={styles.selectionText}>
+                  {selectedShape ? 'Shape Selected' : selectedText ? 'Text Selected' : 'Image Selected'}
+                </Text>
+              </View>
+            )}
+            {elements.map((element) => {
+              // Scale the element properties for display
+              const scaledElement = {
+                ...element,
+                x: element.x * scaleFactor,
+                y: element.y * scaleFactor,
+                width: (element.width || 60) * scaleFactor,
+                height: (element.height || 40) * scaleFactor,
+                ...(element.type === 'text' && { fontSize: (element.fontSize || 16) * scaleFactor }),
+              };
+              
+              if (element.type === 'rectangle' || element.type === 'circle') {
+                return (
+                  <ShapeOnCanvas
+                    key={element.id}
+                    shape={scaledElement}
+                    selected={selectedElements.includes(element.id)}
+                    onPress={() => handleShapePress(element.id, undefined)}
+                    draggable={true}
+                    updatePosition={(x, y) => updateShapePosition(element.id, x / scaleFactor, y / scaleFactor)}
+                    canvasLayout={canvasLayout}
+                    updateSize={(id, width, height, x, y) => updateShapeSize(element.id, width / scaleFactor, height / scaleFactor, x / scaleFactor, y / scaleFactor)}
+                  />
+                );
+              } else if (element.type === 'text') {
+                return (
+                  <TextOnCanvas
+                    key={element.id}
+                    textObj={scaledElement}
+                    selected={selectedElements.includes(element.id)}
+                    onPress={() => handleTextPress(element.id, undefined)}
+                    draggable={true}
+                    updatePosition={(x, y) => updateTextPosition(element.id, x / scaleFactor, y / scaleFactor)}
+                    canvasLayout={canvasLayout}
+                  />
+                );
+              } else if (element.type === 'image') {
+                return (
+                  <ImageOnCanvas
+                    key={element.id}
+                    image={scaledElement}
+                    selected={selectedElements.includes(element.id)}
+                    onPress={() => handleImagePress(element.id, undefined)}
+                    draggable={true}
+                    updatePosition={(x, y) => updateImagePosition(element.id, x / scaleFactor, y / scaleFactor)}
+                    canvasLayout={canvasLayout}
+                    updateSize={(id, width, height, x, y) => updateImageSize(element.id, width / scaleFactor, height / scaleFactor, x / scaleFactor, y / scaleFactor)}
+                  />
+                );
+              }
+              return null;
+            })}
+          </View>
+        </ViewShot>
       </View>
 
       {/* Toolbar */}

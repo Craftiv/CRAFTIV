@@ -197,7 +197,7 @@ export default function ExploreScreen() {
                     setModalVisible(false);
                     router.push({
                       pathname: '/(drawer)/TemplateEditScreen',
-                      params: { templateName: selectedTemplate.name }
+                      params: { templateName: selectedTemplate.name, templateId: selectedTemplate.id }
                     } as any);
                   }}
                 >

@@ -1,9 +1,11 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Tabs, useRouter } from 'expo-router';
 import { StyleSheet, TouchableOpacity } from 'react-native';
+import { useTheme } from '../../../contexts/ThemeContext';
 
 export default function TabLayout() {
   const router = useRouter();
+  const { isDark, colors } = useTheme();
   return (
     <>
       <Tabs
@@ -11,11 +13,11 @@ export default function TabLayout() {
           tabBarHideOnKeyboard: true,
           headerShown: false,
           tabBarStyle: {
-            backgroundColor: '#FFFFFF',
+            backgroundColor: colors.surface,
             borderTopWidth: 0,
           },
-          tabBarActiveTintColor: '#6366F1',
-          tabBarInactiveTintColor: '#333333',
+          tabBarActiveTintColor: colors.primary,
+          tabBarInactiveTintColor: isDark ? colors.textSecondary : '#333333',
           tabBarShowLabel: true,
           tabBarLabelStyle: {
             fontSize: 12,

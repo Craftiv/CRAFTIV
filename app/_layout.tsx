@@ -5,9 +5,10 @@ import { useFonts as useExpoFonts } from 'expo-font';
 import { Stack } from 'expo-router/stack';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useState } from 'react';
-import { DesignProvider } from '../contexts/DesignContext';
-import { ThemeProvider as CustomThemeProvider } from '../contexts/ThemeContext';
 import { AuthProvider } from '../contexts/AuthContext';
+import { DesignProvider } from '../contexts/DesignContext';
+import { SettingsProvider } from '../contexts/SettingsContext';
+import { ThemeProvider as CustomThemeProvider } from '../contexts/ThemeContext';
 
 function RootStack() {
   const colorScheme = useColorScheme();
@@ -76,7 +77,9 @@ function RootStack() {
 export default function AppLayout() {
   return (
     <AuthProvider>
-      <RootStack />
+      <SettingsProvider>
+        <RootStack />
+      </SettingsProvider>
     </AuthProvider>
   );
 }

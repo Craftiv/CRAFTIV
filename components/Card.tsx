@@ -36,13 +36,14 @@ export default function Card({ item, isAddButton = false }: CardProps) {
         // Clear any existing design
         clearDesign();
         
-        // Navigate to CanvaDesignPage with design data
+        // Navigate to TemplateEditScreen with design data
         router.push({
-          pathname: '/CanvaDesignPage' as any,
-          params: { 
+          pathname: '/(drawer)/TemplateEditScreen',
+          params: {
             edit: item.id,
-            designData: JSON.stringify(design.elements),
-            canvasBgColor: design.canvasBackgroundColor || '#fff'
+            templateName: design.label,
+            elements: JSON.stringify(design.elements),
+            canvasBgColor: design.canvasBackgroundColor || '#fff',
           }
         });
       } else {

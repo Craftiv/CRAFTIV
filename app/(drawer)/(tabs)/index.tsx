@@ -3,16 +3,18 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { ScrollView, StatusBar, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Image, Modal, Pressable, ScrollView, StatusBar, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import CategoryTabs from '../../../components/CategoryTabs';
 import Header from '../../../components/Header';
 import Section from '../../../components/Section';
 import TimeGoalPopup from '../../../components/TimeGoalPopup';
+import { API_KEYS } from '../../../constants/apiKeys';
+import { useAuth } from '../../../contexts/AuthContext';
 import { useDesigns } from '../../../contexts/DesignContext';
 import { useTheme } from '../../../contexts/ThemeContext';
 import { useTemplates } from '../../../hooks/useTemplates';
-import { useAuth } from '../../../contexts/AuthContext';
-import { API_KEYS } from '../../../constants/apiKeys';
+import { useDesignStore } from '../../../stores/designStore';
+import { parseFigmaFrameToElements } from '../../../utils/figmaParser';
 
 // Dummy data for other sections
 const whiteboardData = [
@@ -47,7 +49,10 @@ export default function HomeScreen() {
   const [docsTemplates, setDocsTemplates] = useState<DocTemplate[]>([]);
   const [showTimeGoalPopup, setShowTimeGoalPopup] = useState(false);
   const { user } = useAuth();
-  const [logoTemplates, setLogoTemplates] = useState<any[]>([]);
+  const [logoTemplates, setLogoTemplates] = useState<Array<{ id: string; label: string; name: string; image: string }>>([]);
+  const designStore = useDesignStore();
+  const [logoModalVisible, setLogoModalVisible] = useState(false);
+  const [selectedLogo, setSelectedLogo] = useState<{ id: string; label: string; name: string; image: string } | null>(null);
 
   useEffect(() => {
     (async () => {
@@ -76,40 +81,39 @@ export default function HomeScreen() {
   }, []);
 
   useEffect(() => {
-    async function fetchFigmaLogos() {
+    async function fetchLogoTemplates() {
       try {
-        // 1. Fetch file structure
-        const res = await fetch(`https://api.figma.com/v1/files/${API_KEYS.FIGMA_FILE2_KEY}`, {
+        const res = await fetch(`https://api.figma.com/v1/files/${API_KEYS.FIGMA_FILE_KEY}`, {
           headers: { 'X-Figma-Token': API_KEYS.FIGMA_TOKEN }
         });
         const data = await res.json();
-        // 2. Collect the first 5 frame nodes
-        const frames = [];
+        const frameNodes = [];
         for (const page of data.document.children || []) {
           for (const node of page.children || []) {
-            if (node.type === 'FRAME' && frames.length < 5) {
-              frames.push({ id: node.id, name: node.name });
+            if (node.type === 'FRAME') {
+              frameNodes.push({ id: node.id, name: node.name });
             }
           }
         }
-        // 3. Fetch image URLs for these frame IDs
-        const ids = frames.map(f => f.id).join(',');
-        const imageRes = await fetch(`https://api.figma.com/v1/images/${API_KEYS.FIGMA_FILE2_KEY}?ids=${ids}&format=png`, {
+        // Pick frames 13, 14, 15, 16 (0-based index)
+        const selectedFrames = [frameNodes[12], frameNodes[13], frameNodes[14], frameNodes[15]].filter(Boolean);
+        const ids = selectedFrames.map(f => f.id).join(',');
+        const imageRes = await fetch(`https://api.figma.com/v1/images/${API_KEYS.FIGMA_FILE_KEY}?ids=${ids}&format=png`, {
           headers: { 'X-Figma-Token': API_KEYS.FIGMA_TOKEN }
         });
         const imageData = await imageRes.json();
-        // 4. Map frames to image URLs
-        const logos = frames.map(f => ({
+        const templates = selectedFrames.map(f => ({
           id: f.id,
           label: 'Logo',
+          name: f.name,
           image: imageData.images[f.id] || ''
         }));
-        setLogoTemplates(logos);
+        setLogoTemplates(templates);
       } catch (e) {
         setLogoTemplates([]);
       }
     }
-    fetchFigmaLogos();
+    fetchLogoTemplates();
   }, []);
 
   const handleTimeGoalClose = async () => {
@@ -183,6 +187,107 @@ export default function HomeScreen() {
         
         {/* <QuickActions /> */}
         <Section title="Recent Designs" data={recentDesigns} showAddButton={true} />
+        {/* Logo Section before Flyers */}
+        <View style={{ marginVertical: 10 }}>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginHorizontal: 16, marginBottom: 6 }}>
+            <Text style={{ fontWeight: 'bold', fontSize: 18, color: '#6366F1' }}>Logo</Text>
+          </View>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingLeft: 16 }}>
+            {logoTemplates.map(item => (
+              <TouchableOpacity
+                key={item.id}
+                style={{ marginRight: 16, alignItems: 'center', width: 100 }}
+                onPress={() => {
+                  setSelectedLogo(item);
+                  setLogoModalVisible(true);
+                }}
+              >
+                <Image
+                  source={{ uri: item.image }}
+                  style={{ width: 100, height: 150, borderRadius: 12, backgroundColor: '#eee' }}
+                  resizeMode="cover"
+                />
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        </View>
+        <Modal
+          visible={logoModalVisible}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setLogoModalVisible(false)}
+        >
+          <Pressable style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center' }} onPress={() => setLogoModalVisible(false)}>
+            <View style={{ backgroundColor: '#fff', borderRadius: 16, padding: 20, alignItems: 'center', maxWidth: 350, width: '90%' }}>
+              {selectedLogo ? (
+                <>
+                  <Text style={{ fontSize: 20, fontWeight: 'bold', marginBottom: 16, color: '#23235B', textAlign: 'center' }}>{selectedLogo.name}</Text>
+                  {selectedLogo.image ? (
+                    <Image source={{ uri: selectedLogo.image }} style={{ width: 280, height: 280, borderRadius: 12, marginBottom: 20, backgroundColor: '#eee' }} resizeMode="contain" />
+                  ) : (
+                    <View style={{ width: 280, height: 280, borderRadius: 12, marginBottom: 20, backgroundColor: '#ccc', alignItems: 'center', justifyContent: 'center' }}>
+                      <Text style={{ color: '#333', fontSize: 16 }}>No Image</Text>
+                    </View>
+                  )}
+                  <TouchableOpacity
+                    style={{ backgroundColor: '#6366F1', paddingVertical: 10, paddingHorizontal: 24, borderRadius: 8, marginBottom: 12 }}
+                    onPress={async () => {
+                      if (!selectedLogo) return;
+                      // Fetch and set elements for editing
+                      const res = await fetch(`https://api.figma.com/v1/files/${API_KEYS.FIGMA_FILE_KEY}`, {
+                        headers: { 'X-Figma-Token': API_KEYS.FIGMA_TOKEN }
+                      });
+                      const data = await res.json();
+                      function findNode(node: any): any {
+                        if (node.id === selectedLogo.id) return node;
+                        if (node.children) {
+                          for (const child of node.children) {
+                            const found = findNode(child);
+                            if (found) return found;
+                          }
+                        }
+                        return null;
+                      }
+                      const frameNode = findNode(data.document);
+                      if (!frameNode) return;
+                      const elements = parseFigmaFrameToElements(frameNode);
+                      // Fetch image URLs for image elements
+                      const imageElements = elements.filter((el: any) => el.type === 'image');
+                      const imageIds = imageElements.map((el: any) => el.id);
+                      let imageMap: Record<string, string> = {};
+                      if (imageIds.length > 0) {
+                        const imageRes = await fetch(
+                          `https://api.figma.com/v1/images/${API_KEYS.FIGMA_FILE_KEY}?ids=${imageIds.join(',')}&format=png`,
+                          { headers: { 'X-Figma-Token': API_KEYS.FIGMA_TOKEN } }
+                        );
+                        const imageData = await imageRes.json();
+                        imageMap = imageData.images || {};
+                      }
+                      const elementsWithImages = elements.map((el: any, index: number) => {
+                        let updated = { ...el };
+                        if (el.type === 'image' && imageMap[el.id as keyof typeof imageMap]) {
+                          let url = imageMap[el.id as keyof typeof imageMap];
+                          url = url.replace(/^[^h]+(https?:\/\/)/, '$1');
+                          (updated as any).uri = url;
+                        }
+                        updated.id = `${el.type}_${Date.now()}_${index}_${Math.random().toString(36).substr(2, 9)}`;
+                        return updated;
+                      });
+                      designStore.setElements(elementsWithImages);
+                      setLogoModalVisible(false);
+                      router.push({
+                        pathname: '/(drawer)/TemplateEditScreen',
+                        params: { templateName: selectedLogo.name, templateId: selectedLogo.id }
+                      } as any);
+                    }}
+                  >
+                    <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 16 }}>Edit in App</Text>
+                  </TouchableOpacity>
+                </>
+              ) : null}
+            </View>
+          </Pressable>
+        </Modal>
         <Section title="Flyers" data={flyerTemplates} />
         <Section title="Posters" data={posterTemplates} />
         <Section title="Cards & Invites" data={cardTemplates} />
@@ -192,7 +297,6 @@ export default function HomeScreen() {
           data={socialTemplates} 
           onSeeAll={handleSeeAllStories}
         />
-        <Section title="Logos" data={logoTemplates} />
         <Section title="Docs" data={docsTemplates.map(t => ({ id: t.id, label: t.text ? t.text.slice(0, 20) + (t.text.length > 20 ? '...' : '') : 'Doc', image: '', preview: t.text }))} />
       </ScrollView>
       

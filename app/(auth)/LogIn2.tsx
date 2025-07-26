@@ -138,7 +138,7 @@ export default function () {
       
 
       <Text style={styles.terms}>
-        By continuing you agree to Popink's <Text style={styles.link}>Terms of Use</Text>. Read our{" "}
+        By continuing you agree to Craftiv's <Text style={styles.link}>Terms of Use</Text>. Read our{" "}
         <Text style={styles.link}>Privacy Policy</Text>
       </Text>
     </View>

@@ -1,21 +1,23 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import {
+    Image,
     ScrollView,
     StyleSheet,
     Switch,
     Text,
     TouchableOpacity,
-    View,
-    Image
+    View
 } from 'react-native';
-import { useTheme } from '../../../contexts/ThemeContext';
 import { useAuth } from '../../../contexts/AuthContext';
+import { useSettings } from '../../../contexts/SettingsContext';
+import { useTheme } from '../../../contexts/ThemeContext';
 
 export default function SettingsScreen() {
   const { colors, isDark, toggleTheme } = useTheme();
   const router = useRouter();
   const { user } = useAuth();
+  const { autoSave, setAutoSave } = useSettings();
   console.log('Settings user:', user);
 
   const settingsSections = [
@@ -84,14 +86,16 @@ export default function SettingsScreen() {
           subtitle: 'Manage notification settings',
           type: 'link',
           icon: 'notifications',
+          onPress: () => router.push('/(drawer)/NotificationsScreen'),
         },
         {
           id: 'autoSave',
           title: 'Auto Save',
           subtitle: 'Automatically save your work',
           type: 'toggle',
-          value: true,
+          value: autoSave,
           icon: 'save',
+          onValueChange: setAutoSave,
         },
         {
           id: 'quality',
@@ -99,6 +103,7 @@ export default function SettingsScreen() {
           subtitle: 'Set default export quality',
           type: 'link',
           icon: 'settings',
+          onPress: () => router.push('/(drawer)/ExportQualityScreen'),
         },
       ],
     },
@@ -111,6 +116,7 @@ export default function SettingsScreen() {
           subtitle: 'Get help and contact support',
           type: 'link',
           icon: 'help-circle',
+          onPress: () => router.push('/(drawer)/HelpSupportScreen'),
         },
         {
           id: 'feedback',
@@ -118,6 +124,7 @@ export default function SettingsScreen() {
           subtitle: 'Share your thoughts with us',
           type: 'link',
           icon: 'chatbubble',
+          onPress: () => router.push('/(drawer)/FeedbackScreen'),
         },
         {
           id: 'about',
@@ -125,6 +132,7 @@ export default function SettingsScreen() {
           subtitle: 'Version 1.0.0',
           type: 'link',
           icon: 'information-circle',
+          onPress: () => router.push('/(drawer)/AboutScreen'),
         },
       ],
     },
@@ -238,12 +246,36 @@ export default function SettingsScreen() {
   });
 
   const renderSettingItem = (item: any) => {
+    if (item.type === 'toggle') {
+      return (
+        <View
+          key={item.id}
+          style={styles.settingItem}
+        >
+          <View style={styles.settingIcon}>
+            <Ionicons name={item.icon as any} size={20} color={colors.primary} />
+          </View>
+          <View style={styles.settingContent}>
+            <Text style={styles.settingTitle}>{item.title}</Text>
+            <Text style={styles.settingSubtitle}>{item.subtitle}</Text>
+          </View>
+          <View style={styles.settingAction}>
+            <Switch
+              value={item.value}
+              onValueChange={item.onValueChange}
+              trackColor={{ false: colors.border, true: colors.primary + '40' }}
+              thumbColor={item.value ? colors.primary : colors.textSecondary}
+            />
+          </View>
+        </View>
+      );
+    }
     return (
       <TouchableOpacity
         key={item.id}
         style={styles.settingItem}
         onPress={item.onPress}
-        activeOpacity={item.type === 'link' ? 0.7 : 1}
+        activeOpacity={0.7}
       >
         <View style={styles.settingIcon}>
           <Ionicons name={item.icon as any} size={20} color={colors.primary} />
@@ -253,16 +285,7 @@ export default function SettingsScreen() {
           <Text style={styles.settingSubtitle}>{item.subtitle}</Text>
         </View>
         <View style={styles.settingAction}>
-          {item.type === 'toggle' ? (
-            <Switch
-              value={item.value}
-              onValueChange={item.onValueChange}
-              trackColor={{ false: colors.border, true: colors.primary + '40' }}
-              thumbColor={item.value ? colors.primary : colors.textSecondary}
-            />
-          ) : (
-            <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
-          )}
+          <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
         </View>
       </TouchableOpacity>
     );
