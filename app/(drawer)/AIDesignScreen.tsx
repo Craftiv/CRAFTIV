@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
-import Voice from '@react-native-voice/voice';
+// import Voice from '@react-native-voice/voice';
 import { useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import {
     ActivityIndicator,
     Alert,
@@ -28,37 +28,36 @@ export default function AIDesignScreen() {
   } = useAIDesignStore();
   
   const [localPrompt, setLocalPrompt] = useState(prompt);
-  const [isListening, setIsListening] = useState(false);
+  // const [isListening, setIsListening] = useState(false);
 
-  // Voice recognition handlers
-  const onSpeechResults = (event: any) => {
-    if (event.value && event.value.length > 0) {
-      setLocalPrompt(event.value[0]);
-    }
-    setIsListening(false);
-  };
-  const onSpeechError = (event: any) => {
-    setIsListening(false);
-    Alert.alert('Voice Input Error', event.error?.message || 'Could not recognize speech.');
-  };
+  // Voice recognition handlers - temporarily disabled
+  // const onSpeechResults = (event: any) => {
+  //   if (event.value && event.value.length > 0) {
+  //     setLocalPrompt(event.value[0]);
+  //   }
+  //   setIsListening(false);
+  // };
+  // const onSpeechError = (event: any) => {
+  //   setIsListening(false);
+  //   Alert.alert('Voice Input Error', event.error?.message || 'Could not recognize speech.');
+  // };
 
   // Attach/detach listeners
-  useEffect(() => {
-    Voice.onSpeechResults = onSpeechResults;
-    Voice.onSpeechError = onSpeechError;
-    return () => {
-      Voice.destroy().then(Voice.removeAllListeners);
-    };
-  }, []);
+  // useEffect(() => {
+  //   Voice.onSpeechResults = onSpeechResults;
+  //   Voice.onSpeechError = onSpeechError;
+  //   return () => {
+  //     Voice.destroy().then(Voice.removeAllListeners);
+  //   };
+  // }, []);
 
   const handleVoiceInput = async () => {
-    try {
-      setIsListening(true);
-      await Voice.start('en-US');
-    } catch (e) {
-      setIsListening(false);
-      Alert.alert('Voice Input Error', 'Could not start voice recognition.');
-    }
+    // Temporarily disabled - will be re-enabled when voice package is properly configured
+    Alert.alert(
+      'Voice Input', 
+      'Voice input is temporarily unavailable. Please type your design description instead.',
+      [{ text: 'OK' }]
+    );
   };
 
   const handleGenerate = async () => {
@@ -148,9 +147,9 @@ export default function AIDesignScreen() {
           </View>
 
           {/* Voice Input Button */}
-          <TouchableOpacity style={styles.voiceButton} onPress={handleVoiceInput} disabled={isListening}>
-            <Ionicons name="mic" size={20} color={isListening ? '#A78BFA' : '#6366F1'} />
-            <Text style={styles.voiceButtonText}>{isListening ? 'Listening...' : 'Voice Input'}</Text>
+          <TouchableOpacity style={styles.voiceButton} onPress={handleVoiceInput} disabled={true}>
+            <Ionicons name="mic" size={20} color="#999" />
+            <Text style={styles.voiceButtonText}>Voice Input (Coming Soon)</Text>
           </TouchableOpacity>
 
           {/* Generate Button */}
@@ -289,14 +288,15 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingVertical: 12,
     paddingHorizontal: 20,
-    backgroundColor: 'rgba(99, 102, 241, 0.1)',
+    backgroundColor: 'rgba(153, 153, 153, 0.1)',
     borderRadius: 25,
     marginBottom: 24,
     alignSelf: 'center',
+    opacity: 0.6,
   },
   voiceButtonText: {
     fontSize: 14,
-    color: '#6366F1',
+    color: '#999',
     fontWeight: '600',
     marginLeft: 8,
   },

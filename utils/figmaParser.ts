@@ -9,6 +9,57 @@ function figmaColorToHex(color: any) {
   return `#${((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1)}`;
 }
 
+// Helper to extract table data from Figma frame
+function extractTableData(node: any) {
+  if (!node.children || !Array.isArray(node.children)) {
+    return null;
+  }
+
+  const tableData: {
+    title?: string;
+    columns?: string[];
+    rows?: string[][];
+    titleBackgroundColor?: string;
+  } = {};
+
+  // Look for title (usually the first text element)
+  const titleElement = node.children.find((child: any) => 
+    child.type === 'TEXT' && child.characters && 
+    (child.name?.toLowerCase().includes('title') || child.characters.length < 50)
+  );
+  if (titleElement) {
+    tableData.title = titleElement.characters;
+    tableData.titleBackgroundColor = figmaColorToHex(titleElement.fills?.[0]?.color);
+  }
+
+  // Look for column headers
+  const columnElements = node.children.filter((child: any) => 
+    child.type === 'TEXT' && child.characters && 
+    child.name?.toLowerCase().includes('column')
+  );
+  if (columnElements.length > 0) {
+    tableData.columns = columnElements.map((col: any) => col.characters);
+  }
+
+  // Look for row data
+  const rowElements = node.children.filter((child: any) => 
+    child.type === 'TEXT' && child.characters && 
+    child.name?.toLowerCase().includes('row')
+  );
+  if (rowElements.length > 0) {
+    // Group row elements by their y position to form rows
+    const rowGroups: { [key: number]: string[] } = {};
+    rowElements.forEach((row: any) => {
+      const y = Math.round(row.absoluteBoundingBox?.y || 0);
+      if (!rowGroups[y]) rowGroups[y] = [];
+      rowGroups[y].push(row.characters);
+    });
+    tableData.rows = Object.values(rowGroups);
+  }
+
+  return tableData;
+}
+
 // Recursively parse Figma nodes to your Element[]
 export function parseFigmaFrameToElements(frameNode: any): Element[] {
   const elements: Element[] = [];
@@ -90,6 +141,30 @@ export function parseFigmaFrameToElements(frameNode: any): Element[] {
         selected: false,
       } as Element);
     }
+    
+    // Table - detect table-like structures
+    if (node.type === 'FRAME' && node.name?.toLowerCase().includes('table')) {
+      // Extract table data from children
+      const tableData = extractTableData(node);
+      if (tableData) {
+        elements.push({
+          id: node.id,
+          type: 'table',
+          x: (node.absoluteBoundingBox?.x || 0) - originX,
+          y: (node.absoluteBoundingBox?.y || 0) - originY,
+          width: node.absoluteBoundingBox?.width || 300,
+          height: node.absoluteBoundingBox?.height || 200,
+          title: tableData.title || 'Table',
+          columns: tableData.columns || ['Column 1', 'Column 2', 'Column 3'],
+          rows: tableData.rows || [],
+          backgroundColor: figmaColorToHex(node.fills?.[0]?.color) || '#ffffff',
+          borderColor: figmaColorToHex(node.strokes?.[0]?.color) || '#000000',
+          titleBackgroundColor: tableData.titleBackgroundColor || '#4CAF50',
+          selected: false,
+        } as Element);
+      }
+    }
+    
     // Recursively walk all children for frames/groups/components/instances
     if ((['FRAME', 'GROUP', 'COMPONENT', 'INSTANCE'].includes(node.type)) && node.children) {
       if (Array.isArray(node.children)) {

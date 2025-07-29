@@ -1,6 +1,7 @@
 import { AntDesign, FontAwesome, Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useNavigation } from '@react-navigation/native';
+import * as AuthSession from 'expo-auth-session';
 import * as Google from 'expo-auth-session/providers/google';
 import { useFocusEffect, useRouter } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
@@ -11,6 +12,10 @@ import { API_KEYS } from '../../constants/apiKeys';
 
 WebBrowser.maybeCompleteAuthSession();
 const navigation=useNavigation;
+
+const redirectUri = AuthSession.makeRedirectUri({
+  scheme: 'your-app-scheme',
+});
 
 type UserInfo = {
   name: string;
@@ -53,27 +58,33 @@ export default function () {
   };
 
   const sendIdTokenToBackend = async (idToken: string) => {
-    try {
-      const backendResponse = await fetch('http://Localhost:8081/api/auth/google', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ idToken }),
-      });
-      if (!backendResponse.ok) {
-        const errorData = await backendResponse.json();
-        throw new Error(errorData.message || 'Failed to authenticate with backend');
-      }
-      const data = await backendResponse.json();
-      await AsyncStorage.setItem('userToken', data.token);
-      // Clear the time goal popup flag so it shows after login
-      await AsyncStorage.removeItem('hasShownTimeGoal');
-      Alert.alert('Success', 'Logged in with Google!');
-      router.replace('/(drawer)/(tabs)');
-    } catch (error: any) {
-      console.error('Backend authentication error:', error);
-      setErrorMsg(error.message);
-      Alert.alert('Authentication Failed', error.message);
-    }
+    // ======= BACKEND CONNECTION CODE COMMENTED OUT =======
+    // try {
+    //   const backendUrl = getBackendUrl();
+    //   const backendResponse = await fetch(`${backendUrl}/api/auth/google`, {
+    //     method: 'POST',
+    //     headers: { 'Content-Type': 'application/json' },
+    //     body: JSON.stringify({ idToken }),
+    //   });
+    //   if (!backendResponse.ok) {
+    //     const errorData = await backendResponse.json();
+    //     throw new Error(errorData.message || 'Failed to authenticate with backend');
+    //   }
+    //   const data = await backendResponse.json();
+    //   await AsyncStorage.setItem('userToken', data.token);
+    //   await AsyncStorage.removeItem('hasShownTimeGoal');
+    //   Alert.alert('Success', 'Logged in with Google!');
+    //   router.replace('/(drawer)/(tabs)');
+    // } catch (error: any) {
+    //   console.error('Backend authentication error:', error);
+    //   setErrorMsg(error.message);
+    //   Alert.alert('Authentication Failed', error.message);
+    // }
+    // ======= SIMULATE SUCCESSFUL BACKEND RESPONSE =======
+    await AsyncStorage.setItem('userToken', 'mock_token');
+    await AsyncStorage.removeItem('hasShownTimeGoal');
+    Alert.alert('Success', 'Logged in with Google!');
+    router.replace('/(drawer)/(tabs)');
   };
 
   useFocusEffect(

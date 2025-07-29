@@ -5,11 +5,7 @@ import React, { useState } from 'react';
 import { Image, ScrollView, StatusBar, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 
 const DEFAULT_BG = '#fff';
-const COLOR_PALETTE = [
-  '#fff', '#1976D2', '#e74c3c', '#27ae60', '#f1c40f', '#8e44ad', '#000',
-  '#FF9800', '#00BCD4', '#9C27B0', '#F44336', '#4CAF50', '#FFC107', '#3F51B5',
-  '#E91E63', '#009688', '#CDDC39', '#FFEB3B', '#795548', '#607D8B', '#BDBDBD',
-];
+// Color palette removed - using ColorSpectrumPicker instead
 
 export default function PresentationsScreen() {
   const router = useRouter();
@@ -143,23 +139,25 @@ export default function PresentationsScreen() {
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <Text style={{ fontWeight: 'bold', fontSize: 18, marginBottom: 12 }}>Pick Background Color</Text>
-            <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center' }}>
-              {COLOR_PALETTE.map((color) => (
-                <TouchableOpacity
-                  key={color}
-                  style={{
-                    width: 32,
-                    height: 32,
-                    borderRadius: 16,
-                    backgroundColor: color,
-                    margin: 6,
-                    borderWidth: currentSlide.backgroundColor === color ? 3 : 1,
-                    borderColor: currentSlide.backgroundColor === color ? '#6366F1' : '#ccc',
-                  }}
-                  onPress={() => { updateSlide({ backgroundColor: color, backgroundImageUri: '' }); setShowColorPicker(false); }}
-                />
-              ))}
-            </View>
+            <TouchableOpacity
+              style={{
+                paddingHorizontal: 12,
+                paddingVertical: 8,
+                backgroundColor: '#3478f6',
+                borderRadius: 8,
+                flexDirection: 'row',
+                alignItems: 'center',
+                alignSelf: 'center',
+              }}
+              onPress={() => {
+                // For now, just set a default color since we don't have ColorSpectrumPicker here
+                updateSlide({ backgroundColor: '#1976D2', backgroundImageUri: '' });
+                setShowColorPicker(false);
+              }}
+            >
+              <Ionicons name="color-palette" size={16} color="#fff" />
+              <Text style={{ color: '#fff', marginLeft: 4, fontWeight: '600' }}>Choose Color</Text>
+            </TouchableOpacity>
             <TouchableOpacity style={[styles.modalBtn, { backgroundColor: '#eee', marginTop: 16 }]} onPress={() => setShowColorPicker(false)}>
               <Text style={{ color: '#23235B', fontWeight: 'bold' }}>Cancel</Text>
             </TouchableOpacity>
@@ -189,7 +187,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingTop: 48,
+    paddingTop: 40,
     paddingBottom: 16,
     paddingHorizontal: 20,
     backgroundColor: '#fff',
@@ -268,6 +266,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     borderTopWidth: 1,
     borderTopColor: '#eee',
+    paddingBottom: 65, // Increased padding to move toolbar up more
   },
   toolbarBtn: {
     alignItems: 'center',

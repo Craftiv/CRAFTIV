@@ -2,6 +2,7 @@
   "expo": {
     "name": "Craftiv",
     "slug": "Craftiv",
+    "owner": "sackey07",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/Logo.png",

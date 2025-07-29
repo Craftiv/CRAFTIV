@@ -2,18 +2,14 @@ import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
-import { Animated, StatusBar, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { Animated, SafeAreaView, StatusBar, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useDesignStore } from '../../stores/designStore';
 import CanvaDesignPage from './CanvaDesignPage';
 
 const TOTAL_FRAMES = 5;
 
-const COLOR_PALETTE = [
-  '#1976D2', '#e74c3c', '#27ae60', '#f1c40f', '#8e44ad', '#fff', '#000',
-  '#FF9800', '#00BCD4', '#9C27B0', '#F44336', '#4CAF50', '#FFC107', '#3F51B5',
-  '#E91E63', '#009688', '#CDDC39', '#FFEB3B', '#795548', '#607D8B', '#BDBDBD',
-];
+// Color palette removed - using ColorSpectrumPicker instead
 
 const styles = StyleSheet.create({
   header: {
@@ -36,6 +32,7 @@ const styles = StyleSheet.create({
   },
   playButton: {
     padding: 8,
+    marginRight: 8,
   },
   timeline: {
     flexDirection: 'row',
@@ -68,10 +65,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-around',
     alignItems: 'center',
-    paddingVertical: 10,
+    paddingVertical: 15,
+    paddingHorizontal: 20,
     backgroundColor: '#fff',
     borderTopWidth: 1,
     borderTopColor: '#eee',
+    paddingBottom: 35, // Add extra padding to avoid navigation buttons
   },
   toolbarBtn: {
     alignItems: 'center',
@@ -269,6 +268,25 @@ export default function MobileVideoScreen() {
     setShowShapePicker(false);
   };
 
+  // Add Table
+  const handleAddTable = () => {
+    designStore.addElement({
+      id: `table_${Date.now()}`,
+      type: 'table',
+      x: 50,
+      y: 50,
+      width: 300,
+      height: 200,
+      title: 'New Table',
+      columns: ['Column 1', 'Column 2'],
+      rows: [['Row 1, Col 1', 'Row 1, Col 2']],
+      backgroundColor: '#ffffff',
+      borderColor: '#000000',
+      titleBackgroundColor: '#4CAF50',
+      selected: false,
+    } as any);
+  };
+
   // Undo
   const handleUndo = () => {
     if (designStore.canUndo()) designStore.undo();
@@ -285,10 +303,14 @@ export default function MobileVideoScreen() {
   }, []);
 
   return (
-    <View style={{ flex: 1, backgroundColor: colors.background }}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }}>
       <StatusBar barStyle="dark-content" />
-      {/* Timeline */}
+      
+      {/* Timeline with Play Button */}
       <View style={styles.timeline}>
+        <TouchableOpacity style={styles.playButton} onPress={handlePlay} disabled={isPlaying}>
+          <Ionicons name={isPlaying ? "pause" : "play"} size={24} color="#6366F1" />
+        </TouchableOpacity>
         {Array.from({ length: TOTAL_FRAMES }).map((_, idx) => (
           <TouchableOpacity
             key={idx}
@@ -302,9 +324,9 @@ export default function MobileVideoScreen() {
       </View>
      
       <View style={{ flex: 1 }}>
-      
         <CanvaDesignPage hideToolbar />
       </View>
+      
       {/* Minimal Toolbar */}
       <View style={styles.toolbar}>
         <TouchableOpacity style={styles.toolbarBtn} onPress={handleAddRectangle}>
@@ -323,9 +345,9 @@ export default function MobileVideoScreen() {
           <Ionicons name="shapes" size={24} color="#6366F1" />
           <Text style={styles.toolbarBtnText}>Shape</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.toolbarBtn} onPress={handleUndo}>
-          <Ionicons name="arrow-undo" size={24} color="#6366F1" />
-          <Text style={styles.toolbarBtnText}>Undo</Text>
+        <TouchableOpacity style={styles.toolbarBtn} onPress={handleAddTable}>
+          <Ionicons name="grid-outline" size={24} color="#6366F1" />
+          <Text style={styles.toolbarBtnText}>Table</Text>
         </TouchableOpacity>
         <TouchableOpacity style={styles.toolbarBtn} onPress={handleDelete}>
           <Ionicons name="trash-outline" size={24} color="#FF3B30" />
@@ -377,23 +399,25 @@ export default function MobileVideoScreen() {
         <View style={styles.textModalOverlay}>
           <View style={styles.textModalContent}>
             <Text style={{ fontWeight: 'bold', fontSize: 18, marginBottom: 12 }}>Pick Color</Text>
-            <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center' }}>
-              {COLOR_PALETTE.map((color) => (
-                <TouchableOpacity
-                  key={color}
-                  style={{
-                    width: 32,
-                    height: 32,
-                    borderRadius: 16,
-                    backgroundColor: color,
-                    margin: 6,
-                    borderWidth: selectedColor === color ? 3 : 1,
-                    borderColor: selectedColor === color ? '#6366F1' : '#ccc',
-                  }}
-                  onPress={() => handleColorSelect(color)}
-                />
-              ))}
-            </View>
+            <TouchableOpacity
+              style={{
+                paddingHorizontal: 12,
+                paddingVertical: 8,
+                backgroundColor: '#3478f6',
+                borderRadius: 8,
+                flexDirection: 'row',
+                alignItems: 'center',
+                alignSelf: 'center',
+              }}
+              onPress={() => {
+                // For now, just set a default color since we don't have ColorSpectrumPicker here
+                handleColorSelect('#1976D2');
+                setShowColorPicker(false);
+              }}
+            >
+              <Ionicons name="color-palette" size={16} color="#fff" />
+              <Text style={{ color: '#fff', marginLeft: 4, fontWeight: '600' }}>Choose Color</Text>
+            </TouchableOpacity>
             <TouchableOpacity style={[styles.textModalBtn, { backgroundColor: '#eee', marginTop: 16 }]} onPress={() => setShowColorPicker(false)}>
               <Text style={{ color: '#23235B', fontWeight: 'bold' }}>Cancel</Text>
             </TouchableOpacity>
@@ -407,6 +431,6 @@ export default function MobileVideoScreen() {
           </Text>
         </View>
       )}
-    </View>
+    </SafeAreaView>
   );
 } 

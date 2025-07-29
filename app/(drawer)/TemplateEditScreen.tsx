@@ -1,22 +1,23 @@
 import { Ionicons } from '@expo/vector-icons';
+import Slider from '@react-native-community/slider';
 import * as ImagePicker from 'expo-image-picker';
 import * as MediaLibrary from 'expo-media-library';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useRef, useState } from 'react';
 import {
-  Alert,
-  Animated,
-  Dimensions,
-  GestureResponderEvent,
-  Image,
-  Modal,
-  PanResponder,
-  StatusBar,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View
+    Alert,
+    Animated,
+    Dimensions,
+    GestureResponderEvent,
+    Image,
+    Modal,
+    PanResponder,
+    StatusBar,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View
 } from 'react-native';
 import ViewShot, { captureRef } from 'react-native-view-shot';
 import { useDesigns } from '../../contexts/DesignContext';
@@ -25,13 +26,143 @@ import { useDesignStore } from '../../stores/designStore';
 
 type IoniconsName = React.ComponentProps<typeof Ionicons>["name"];
 
-const COLOR_PALETTE: string[] = [
-  '#1976D2', '#e74c3c', '#27ae60', '#f1c40f', '#8e44ad', '#fff', '#000',
-  '#FF9800', '#00BCD4', '#9C27B0', '#F44336', '#4CAF50', '#FFC107', '#3F51B5',
-  '#E91E63', '#009688', '#CDDC39', '#FFEB3B', '#795548', '#607D8B', '#BDBDBD',
-];
+// Color palette removed - using ColorSpectrumPicker instead
+
+const ColorSpectrumPicker = ({ 
+  visible, 
+  onClose, 
+  onColorSelect, 
+  initialColor = '#1976D2' 
+}: {
+  visible: boolean;
+  onClose: () => void;
+  onColorSelect: (color: string) => void;
+  initialColor?: string;
+}) => {
+  const [hue, setHue] = useState(210);
+  const [saturation, setSaturation] = useState(100);
+  const [brightness, setBrightness] = useState(100);
+
+  const hsvToHex = React.useCallback((h: number, s: number, v: number): string => {
+    const c = (v / 100) * (s / 100);
+    const x = c * (1 - Math.abs((h / 60) % 2 - 1));
+    const m = (v / 100) - c;
+    
+    let r = 0, g = 0, b = 0;
+    
+    if (h >= 0 && h < 60) {
+      r = c; g = x; b = 0;
+    } else if (h >= 60 && h < 120) {
+      r = x; g = c; b = 0;
+    } else if (h >= 120 && h < 180) {
+      r = 0; g = c; b = x;
+    } else if (h >= 180 && h < 240) {
+      r = 0; g = x; b = c;
+    } else if (h >= 240 && h < 300) {
+      r = x; g = 0; b = c;
+    } else {
+      r = c; g = 0; b = x;
+    }
+    
+    const red = Math.round((r + m) * 255);
+    const green = Math.round((g + m) * 255);
+    const blue = Math.round((b + m) * 255);
+    
+    return `#${red.toString(16).padStart(2, '0')}${green.toString(16).padStart(2, '0')}${blue.toString(16).padStart(2, '0')}`;
+  }, []);
+
+  // Calculate current color without state updates
+  const currentColor = React.useMemo(() => {
+    return hsvToHex(hue, saturation, brightness);
+  }, [hue, saturation, brightness, hsvToHex]);
+
+  const handleApply = () => {
+    onColorSelect(currentColor);
+    onClose();
+  };
+
+  if (!visible) return null;
+
+  return (
+    <Modal visible={visible} transparent animationType="fade">
+      <View style={styles.colorPickerOverlay}>
+        <View style={styles.colorPickerContainer}>
+          <Text style={styles.colorSpectrumPickerTitle}>Choose Color</Text>
+          
+          <View style={styles.colorPreview}>
+            <View style={[styles.colorSwatch, { backgroundColor: currentColor }]} />
+            <Text style={styles.colorHex}>{currentColor}</Text>
+          </View>
+          
+          <View style={styles.sliderContainer}>
+            <Text style={styles.sliderLabel}>Hue</Text>
+            <Slider
+              style={styles.slider}
+              minimumValue={0}
+              maximumValue={360}
+              value={hue}
+              onValueChange={(value) => {
+                // Throttle updates to prevent excessive re-renders
+                requestAnimationFrame(() => setHue(value));
+              }}
+              minimumTrackTintColor="#3478f6"
+              maximumTrackTintColor="#ddd"
+            />
+          </View>
+          
+          <View style={styles.sliderContainer}>
+            <Text style={styles.sliderLabel}>Saturation</Text>
+            <Slider
+              style={styles.slider}
+              minimumValue={0}
+              maximumValue={100}
+              value={saturation}
+              onValueChange={(value) => {
+                // Throttle updates to prevent excessive re-renders
+                requestAnimationFrame(() => setSaturation(value));
+              }}
+              minimumTrackTintColor="#3478f6"
+              maximumTrackTintColor="#ddd"
+            />
+          </View>
+          
+          <View style={styles.sliderContainer}>
+            <Text style={styles.sliderLabel}>Brightness</Text>
+            <Slider
+              style={styles.slider}
+              minimumValue={0}
+              maximumValue={100}
+              value={brightness}
+              onValueChange={(value) => {
+                // Throttle updates to prevent excessive re-renders
+                requestAnimationFrame(() => setBrightness(value));
+              }}
+              minimumTrackTintColor="#3478f6"
+              maximumTrackTintColor="#ddd"
+            />
+          </View>
+          
+          <View style={styles.colorPickerButtons}>
+            <TouchableOpacity style={styles.cancelButton} onPress={onClose}>
+              <Text style={styles.cancelButtonText}>Cancel</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.applyButton} onPress={handleApply}>
+              <Text style={styles.applyButtonText}>Apply</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
+    </Modal>
+  );
+};
 
 const FONT_FAMILIES: string[] = ['System', 'Arial', 'Helvetica', 'Times New Roman', 'Georgia'];
+
+const TEXT_COLORS = [
+  '#000000', '#FFFFFF', '#FF0000', '#00FF00', '#0000FF', '#FFFF00', 
+  '#FF00FF', '#00FFFF', '#FFA500', '#800080', '#008000', '#FFC0CB',
+  '#A52A2A', '#808080', '#C0C0C0', '#FFD700', '#FF6347', '#32CD32'
+];
 
 const screenWidth = Dimensions.get('window').width;
 const screenHeight = Dimensions.get('window').height;
@@ -63,14 +194,30 @@ const ResizeHandle = ({ x, y, onResize, style, type }: {
   type: 'corner' | 'side';
 }) => {
   const pan = React.useRef(new Animated.ValueXY({ x: 0, y: 0 })).current;
+  const lastPosition = React.useRef({ x: 0, y: 0 });
+  const lastUpdate = React.useRef(0);
+  
   const panResponder = React.useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: () => true,
+      onPanResponderGrant: () => {
+        lastPosition.current = { x: 0, y: 0 };
+      },
       onPanResponderMove: (e, gesture) => {
-        onResize(gesture.dx, gesture.dy);
+        const dx = gesture.dx - lastPosition.current.x;
+        const dy = gesture.dy - lastPosition.current.y;
+        lastPosition.current = { x: gesture.dx, y: gesture.dy };
+        
+        // Throttle updates to prevent excessive re-renders
+        const now = Date.now();
+        if (now - lastUpdate.current > 16) { // ~60fps
+          onResize(dx, dy);
+          lastUpdate.current = now;
+        }
       },
       onPanResponderRelease: () => {
         pan.setValue({ x: 0, y: 0 });
+        lastPosition.current = { x: 0, y: 0 };
       },
     })
   ).current;
@@ -174,13 +321,23 @@ const ShapeOnCanvas = ({ shape, selected, onPress, draggable, updatePosition, ca
         newW = width - dx;
         newH = height - dy;
         break;
+      case 'top':
+        newY = y + dy;
+        newH = height - dy;
+        break;
       case 'topRight':
         newY = y + dy;
         newW = width + dx;
         newH = height - dy;
         break;
+      case 'right':
+        newW = width + dx;
+        break;
       case 'bottomRight':
         newW = width + dx;
+        newH = height + dy;
+        break;
+      case 'bottom':
         newH = height + dy;
         break;
       case 'bottomLeft':
@@ -188,12 +345,19 @@ const ShapeOnCanvas = ({ shape, selected, onPress, draggable, updatePosition, ca
         newW = width - dx;
         newH = height + dy;
         break;
+      case 'left':
+        newX = x + dx;
+        newW = width - dx;
+        break;
     }
     
-    newW = Math.max(30, Math.min(newW, canvasLayout.width - newX));
-    newH = Math.max(30, Math.min(newH, canvasLayout.height - newY));
+    // Apply constraints
+    const minSize = shape.type === 'circle' ? 30 : 30;
+    newW = Math.max(minSize, Math.min(newW, canvasLayout.width - newX));
+    newH = Math.max(minSize, Math.min(newH, canvasLayout.height - newY));
     newX = Math.max(0, Math.min(newX, canvasLayout.width - newW));
     newY = Math.max(0, Math.min(newY, canvasLayout.height - newH));
+    
     updateSize(shape.id, newW, newH, newX, newY);
   };
 
@@ -252,20 +416,31 @@ const ShapeOnCanvas = ({ shape, selected, onPress, draggable, updatePosition, ca
       }}
     >
       {renderShape()}
-      {selected && ['topLeft', 'topRight', 'bottomRight', 'bottomLeft'].map((handle) => (
+      {selected && [
+        // Corner handles
+        { handle: 'topLeft', x: 0, y: 0, type: 'corner' as const },
+        { handle: 'topRight', x: shape.width || 60, y: 0, type: 'corner' as const },
+        { handle: 'bottomRight', x: shape.width || 60, y: shape.height || 40, type: 'corner' as const },
+        { handle: 'bottomLeft', x: 0, y: shape.height || 40, type: 'corner' as const },
+        // Side handles
+        { handle: 'top', x: (shape.width || 60) / 2, y: 0, type: 'side' as const },
+        { handle: 'right', x: shape.width || 60, y: (shape.height || 40) / 2, type: 'side' as const },
+        { handle: 'bottom', x: (shape.width || 60) / 2, y: shape.height || 40, type: 'side' as const },
+        { handle: 'left', x: 0, y: (shape.height || 40) / 2, type: 'side' as const },
+      ].map(({ handle, x, y, type }) => (
         <ResizeHandle
           key={handle}
-          x={handle.includes('Right') ? (shape.width || 60) : 0}
-          y={handle.includes('bottom') ? (shape.height || 40) : 0}
+          x={x}
+          y={y}
           onResize={(dx, dy) => handleResize(handle, dx, dy)}
-          type="corner"
+          type={type}
         />
       ))}
     </Animated.View>
   );
 };
 
-const TextOnCanvas = ({ textObj, selected, onPress, draggable, updatePosition, canvasLayout, onDoubleTap }: {
+const TextOnCanvas = ({ textObj, selected, onPress, draggable, updatePosition, canvasLayout, onDoubleTap, updateSize }: {
   textObj: any;
   selected?: boolean;
   onPress?: (e?: GestureResponderEvent) => void;
@@ -273,10 +448,26 @@ const TextOnCanvas = ({ textObj, selected, onPress, draggable, updatePosition, c
   updatePosition?: (x: number, y: number) => void;
   canvasLayout?: { x: number; y: number; width: number; height: number };
   onDoubleTap?: () => void;
+  updateSize?: (id: string, newWidth: number, newHeight: number, newX: number, newY: number) => void;
 }) => {
   const pan = React.useRef(new Animated.ValueXY({ x: textObj.x, y: textObj.y })).current;
   const panOffset = React.useRef({ x: textObj.x, y: textObj.y });
   const isDragging = React.useRef(false);
+  const lastTap = React.useRef(0);
+  
+  // Get actual dimensions with fallbacks
+  const actualWidth = textObj.width || 200;
+  const actualHeight = textObj.height || 50;
+  
+  // Add state to track dimensions and make them reactive
+  const [currentWidth, setCurrentWidth] = React.useState(actualWidth);
+  const [currentHeight, setCurrentHeight] = React.useState(actualHeight);
+  
+  // Update dimensions when textObj changes
+  React.useEffect(() => {
+    setCurrentWidth(textObj.width || 200);
+    setCurrentHeight(textObj.height || 50);
+  }, [textObj.width, textObj.height]);
   
   React.useEffect(() => {
     // Don't update position if we're currently dragging
@@ -307,23 +498,75 @@ const TextOnCanvas = ({ textObj, selected, onPress, draggable, updatePosition, c
         if (!canvasLayout) return;
         let newX = gesture.dx + panOffset.current.x;
         let newY = gesture.dy + panOffset.current.y;
-        newX = Math.max(0, Math.min(newX, canvasLayout.width - 100));
-        newY = Math.max(0, Math.min(newY, canvasLayout.height - 30));
+        newX = Math.max(0, Math.min(newX, canvasLayout.width - currentWidth));
+        newY = Math.max(0, Math.min(newY, canvasLayout.height - currentHeight));
         pan.setValue({ x: newX, y: newY });
       },
       onPanResponderRelease: (e: GestureResponderEvent, gesture) => {
         if (!canvasLayout) return;
         let newX = gesture.dx + panOffset.current.x;
         let newY = gesture.dy + panOffset.current.y;
-        newX = Math.max(0, Math.min(newX, canvasLayout.width - 100));
-        newY = Math.max(0, Math.min(newY, canvasLayout.height - 30));
+        newX = Math.max(0, Math.min(newX, canvasLayout.width - currentWidth));
+        newY = Math.max(0, Math.min(newY, canvasLayout.height - currentHeight));
         pan.setValue({ x: newX, y: newY });
         panOffset.current = { x: newX, y: newY };
         updatePosition && updatePosition(newX, newY);
         isDragging.current = false;
+        
+        // Check for double tap
+        const now = Date.now();
+        const DOUBLE_TAP_DELAY = 300;
+        if (now - lastTap.current < DOUBLE_TAP_DELAY) {
+          // Double tap detected
+          if (onDoubleTap) {
+            onDoubleTap();
+          }
+        }
+        lastTap.current = now;
       },
     })
   ).current;
+
+  // Calculate responsive font size based on container size
+  const getResponsiveFontSize = () => {
+    const storedFontSize = textObj.fontSize || 16;
+    const containerWidth = currentWidth;
+    const containerHeight = currentHeight;
+    const textLength = textObj.text?.length || 0;
+    
+    // Calculate optimal font size based on container dimensions
+    const minDimension = Math.min(containerWidth, containerHeight);
+    const maxDimension = Math.max(containerWidth, containerHeight);
+    
+    // Base font size calculation - more responsive to container size
+    let responsiveSize = Math.max(8, Math.min(48, minDimension * 0.35));
+    
+    // Adjust based on aspect ratio
+    const aspectRatio = containerWidth / containerHeight;
+    if (aspectRatio > 3) {
+      // Very wide container - reduce font size
+      responsiveSize *= 0.8;
+    } else if (aspectRatio < 0.5) {
+      // Very tall container - increase font size slightly
+      responsiveSize *= 1.1;
+    }
+    
+    // Adjust for text length with better scaling
+    if (textLength > 100) {
+      responsiveSize *= 0.6;
+    } else if (textLength > 50) {
+      responsiveSize *= 0.75;
+    } else if (textLength > 20) {
+      responsiveSize *= 0.85;
+    } else if (textLength < 5) {
+      responsiveSize *= 1.2;
+    }
+    
+    // Ensure bounds with better limits
+    responsiveSize = Math.max(6, Math.min(60, responsiveSize));
+    
+    return Math.round(responsiveSize);
+  };
 
   return (
     <Animated.View
@@ -336,18 +579,135 @@ const TextOnCanvas = ({ textObj, selected, onPress, draggable, updatePosition, c
         borderRadius: 8,
         backgroundColor: selected ? 'rgba(0, 122, 255, 0.1)' : 'transparent',
         transform: pan.getTranslateTransform(),
+        width: currentWidth,
+        height: currentHeight,
+        minWidth: 40,
+        minHeight: 25,
       }}
     >
       <Text
         style={{
-          fontSize: textObj.fontSize || 16,
+          fontSize: getResponsiveFontSize(),
           color: textObj.color || '#23235B',
           fontWeight: 'bold',
           fontFamily: textObj.fontFamily || 'System',
+          width: '100%',
+          height: '100%',
+          textAlign: 'center',
+          textAlignVertical: 'center',
+          paddingHorizontal: Math.max(4, currentWidth * 0.03),
+          paddingVertical: Math.max(2, currentHeight * 0.03),
+          includeFontPadding: false,
+          lineHeight: currentHeight * 0.85, // Better line height for text centering
+          letterSpacing: 0.5, // Better letter spacing for readability
         }}
+        numberOfLines={Math.max(1, Math.floor(currentHeight / getResponsiveFontSize()))}
+        adjustsFontSizeToFit={true}
+        minimumFontScale={0.2}
+        allowFontScaling={true}
+        ellipsizeMode="tail"
       >
         {textObj.text}
       </Text>
+      
+      {/* Resize handles - only show when selected */}
+      {selected && updateSize && (
+        <>
+          {/* Corner resize handles */}
+          <ResizeHandle
+            x={0}
+            y={0}
+            onResize={(dx, dy) => {
+              const newWidth = Math.max(40, currentWidth - dx);
+              const newHeight = Math.max(25, currentHeight - dy);
+              const newX = textObj.x + dx;
+              const newY = textObj.y + dy;
+              updateSize(textObj.id, newWidth, newHeight, newX, newY);
+            }}
+            type="corner"
+            style={{ position: 'absolute', top: -5, left: -5 }}
+          />
+          <ResizeHandle
+            x={currentWidth - 10}
+            y={0}
+            onResize={(dx, dy) => {
+              const newWidth = Math.max(40, currentWidth + dx);
+              const newHeight = Math.max(25, currentHeight - dy);
+              const newY = textObj.y + dy;
+              updateSize(textObj.id, newWidth, newHeight, textObj.x, newY);
+            }}
+            type="corner"
+            style={{ position: 'absolute', top: -5, right: -5 }}
+          />
+          <ResizeHandle
+            x={0}
+            y={currentHeight - 10}
+            onResize={(dx, dy) => {
+              const newWidth = Math.max(40, currentWidth - dx);
+              const newHeight = Math.max(25, currentHeight + dy);
+              const newX = textObj.x + dx;
+              updateSize(textObj.id, newWidth, newHeight, newX, textObj.y);
+            }}
+            type="corner"
+            style={{ position: 'absolute', bottom: -5, left: -5 }}
+          />
+          <ResizeHandle
+            x={currentWidth - 10}
+            y={currentHeight - 10}
+            onResize={(dx, dy) => {
+              const newWidth = Math.max(40, currentWidth + dx);
+              const newHeight = Math.max(25, currentHeight + dy);
+              updateSize(textObj.id, newWidth, newHeight, textObj.x, textObj.y);
+            }}
+            type="corner"
+            style={{ position: 'absolute', bottom: -5, right: -5 }}
+          />
+          
+          {/* Side resize handles */}
+          <ResizeHandle
+            x={currentWidth / 2 - 5}
+            y={0}
+            onResize={(dx, dy) => {
+              const newHeight = Math.max(25, currentHeight - dy);
+              const newY = textObj.y + dy;
+              updateSize(textObj.id, currentWidth, newHeight, textObj.x, newY);
+            }}
+            type="side"
+            style={{ position: 'absolute', top: -5, left: '50%', marginLeft: -5 }}
+          />
+          <ResizeHandle
+            x={currentWidth / 2 - 5}
+            y={currentHeight - 10}
+            onResize={(dx, dy) => {
+              const newHeight = Math.max(25, currentHeight + dy);
+              updateSize(textObj.id, currentWidth, newHeight, textObj.x, textObj.y);
+            }}
+            type="side"
+            style={{ position: 'absolute', bottom: -5, left: '50%', marginLeft: -5 }}
+          />
+          <ResizeHandle
+            x={0}
+            y={currentHeight / 2 - 5}
+            onResize={(dx, dy) => {
+              const newWidth = Math.max(40, currentWidth - dx);
+              const newX = textObj.x + dx;
+              updateSize(textObj.id, newWidth, currentHeight, newX, textObj.y);
+            }}
+            type="side"
+            style={{ position: 'absolute', left: -5, top: '50%', marginTop: -5 }}
+          />
+          <ResizeHandle
+            x={currentWidth - 10}
+            y={currentHeight / 2 - 5}
+            onResize={(dx, dy) => {
+              const newWidth = Math.max(40, currentWidth + dx);
+              updateSize(textObj.id, newWidth, currentHeight, textObj.x, textObj.y);
+            }}
+            type="side"
+            style={{ position: 'absolute', right: -5, top: '50%', marginTop: -5 }}
+          />
+        </>
+      )}
     </Animated.View>
   );
 };
@@ -412,6 +772,7 @@ const ImageOnCanvas = ({ image, selected, onPress, draggable, updatePosition, ca
     if (!updateSize || !canvasLayout) return;
     let { x, y, width, height } = image;
     let newX = x, newY = y, newW = width, newH = height;
+    
     switch (handle) {
       case 'topLeft':
         newX = x + dx;
@@ -419,13 +780,23 @@ const ImageOnCanvas = ({ image, selected, onPress, draggable, updatePosition, ca
         newW = width - dx;
         newH = height - dy;
         break;
+      case 'top':
+        newY = y + dy;
+        newH = height - dy;
+        break;
       case 'topRight':
         newY = y + dy;
         newW = width + dx;
         newH = height - dy;
         break;
+      case 'right':
+        newW = width + dx;
+        break;
       case 'bottomRight':
         newW = width + dx;
+        newH = height + dy;
+        break;
+      case 'bottom':
         newH = height + dy;
         break;
       case 'bottomLeft':
@@ -433,25 +804,19 @@ const ImageOnCanvas = ({ image, selected, onPress, draggable, updatePosition, ca
         newW = width - dx;
         newH = height + dy;
         break;
-      case 'top':
-        newY = y + dy;
-        newH = height - dy;
-        break;
-      case 'right':
-        newW = width + dx;
-        break;
-      case 'bottom':
-        newH = height + dy;
-        break;
       case 'left':
         newX = x + dx;
         newW = width - dx;
         break;
     }
-    newW = Math.max(30, Math.min(newW, canvasLayout.width - newX));
-    newH = Math.max(30, Math.min(newH, canvasLayout.height - newY));
+    
+    // Apply constraints
+    const minSize = 30;
+    newW = Math.max(minSize, Math.min(newW, canvasLayout.width - newX));
+    newH = Math.max(minSize, Math.min(newH, canvasLayout.height - newY));
     newX = Math.max(0, Math.min(newX, canvasLayout.width - newW));
     newY = Math.max(0, Math.min(newY, canvasLayout.height - newH));
+    
     updateSize(image.id, newW, newH, newX, newY);
   };
 
@@ -499,6 +864,266 @@ const ImageOnCanvas = ({ image, selected, onPress, draggable, updatePosition, ca
   );
 };
 
+export interface TableElement {
+  id: string;
+  type: 'table';
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  title: string;
+  columns: string[];
+  rows: string[][];
+  backgroundColor: string;
+  borderColor: string;
+  titleBackgroundColor: string;
+  selected: boolean;
+}
+
+const TableOnCanvas = ({ table, selected, onPress, draggable, updatePosition, canvasLayout, updateSize }: {
+  table: any;
+  selected?: boolean;
+  onPress?: (e?: GestureResponderEvent) => void;
+  draggable?: boolean;
+  updatePosition?: (x: number, y: number) => void;
+  canvasLayout?: { x: number; y: number; width: number; height: number };
+  updateSize?: (id: string, newWidth: number, newHeight: number, newX: number, newY: number) => void;
+}) => {
+  const pan = React.useRef(new Animated.ValueXY({ x: table.x, y: table.y })).current;
+  const panOffset = React.useRef({ x: table.x, y: table.y });
+  const isDragging = React.useRef(false);
+  
+  React.useEffect(() => {
+    if (isDragging.current) return;
+    const currentX = panOffset.current.x;
+    const currentY = panOffset.current.y;
+    const newX = table.x;
+    const newY = table.y;
+    if (Math.abs(currentX - newX) > 1 || Math.abs(currentY - newY) > 1) {
+      pan.setValue({ x: newX, y: newY });
+      panOffset.current = { x: newX, y: newY };
+    }
+  }, [table.x, table.y]);
+
+  const panResponder = React.useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onPanResponderGrant: (evt: GestureResponderEvent) => {
+        if (onPress) onPress(evt);
+        isDragging.current = true;
+        panOffset.current = { x: table.x, y: table.y };
+      },
+      onPanResponderMove: (e: GestureResponderEvent, gesture) => {
+        if (!canvasLayout) return;
+        let newX = gesture.dx + panOffset.current.x;
+        let newY = gesture.dy + panOffset.current.y;
+        newX = Math.max(0, Math.min(newX, canvasLayout.width - (table.width || 300)));
+        newY = Math.max(0, Math.min(newY, canvasLayout.height - (table.height || 200)));
+        pan.setValue({ x: newX, y: newY });
+      },
+      onPanResponderRelease: (e: GestureResponderEvent, gesture) => {
+        if (!canvasLayout) return;
+        let newX = gesture.dx + panOffset.current.x;
+        let newY = gesture.dy + panOffset.current.y;
+        newX = Math.max(0, Math.min(newX, canvasLayout.width - (table.width || 300)));
+        newY = Math.max(0, Math.min(newY, canvasLayout.height - (table.height || 200)));
+        pan.setValue({ x: newX, y: newY });
+        panOffset.current = { x: newX, y: newY };
+        updatePosition && updatePosition(newX, newY);
+        isDragging.current = false;
+      },
+    })
+  ).current;
+
+  const handleResize = (handle: string, dx: number, dy: number) => {
+    if (!updateSize || !canvasLayout) return;
+    let { x, y, width, height } = table;
+    let newX = x, newY = y, newW = width, newH = height;
+    
+    switch (handle) {
+      case 'topLeft':
+        newX = x + dx;
+        newY = y + dy;
+        newW = width - dx;
+        newH = height - dy;
+        break;
+      case 'top':
+        newY = y + dy;
+        newH = height - dy;
+        break;
+      case 'topRight':
+        newY = y + dy;
+        newW = width + dx;
+        newH = height - dy;
+        break;
+      case 'right':
+        newW = width + dx;
+        break;
+      case 'bottomRight':
+        newW = width + dx;
+        newH = height + dy;
+        break;
+      case 'bottom':
+        newH = height + dy;
+        break;
+      case 'bottomLeft':
+        newX = x + dx;
+        newW = width - dx;
+        newH = height + dy;
+        break;
+      case 'left':
+        newX = x + dx;
+        newW = width - dx;
+        break;
+    }
+    
+    // Apply constraints for tables
+    const minWidth = 200;
+    const minHeight = 100;
+    newW = Math.max(minWidth, Math.min(newW, canvasLayout.width - newX));
+    newH = Math.max(minHeight, Math.min(newH, canvasLayout.height - newY));
+    newX = Math.max(0, Math.min(newX, canvasLayout.width - newW));
+    newY = Math.max(0, Math.min(newY, canvasLayout.height - newH));
+    
+    updateSize(table.id, newW, newH, newX, newY);
+  };
+
+  const renderTable = () => {
+    const { title, columns, rows, backgroundColor, borderColor, titleBackgroundColor } = table;
+    const cellWidth = (table.width || 300) / Math.max(columns?.length || 1, 1);
+    const headerHeight = 40;
+    const rowHeight = 30;
+    const titleHeight = title ? 40 : 0;
+
+    return (
+      <View style={{
+        width: table.width || 300,
+        height: table.height || 200,
+        backgroundColor: backgroundColor || '#ffffff',
+        borderWidth: 1,
+        borderColor: borderColor || '#000000',
+        borderRadius: 4,
+        overflow: 'hidden',
+      }}>
+        {/* Title */}
+        {title && (
+          <View style={{
+            height: titleHeight,
+            backgroundColor: titleBackgroundColor || '#4CAF50',
+            justifyContent: 'center',
+            alignItems: 'center',
+            borderBottomWidth: 1,
+            borderBottomColor: borderColor || '#000000',
+          }}>
+            <Text style={{
+              color: '#ffffff',
+              fontSize: 16,
+              fontWeight: 'bold',
+            }}>
+              {title}
+            </Text>
+          </View>
+        )}
+        
+        {/* Column Headers */}
+        <View style={{
+          flexDirection: 'row',
+          height: headerHeight,
+          borderBottomWidth: 1,
+          borderBottomColor: borderColor || '#000000',
+        }}>
+          {columns?.map((column: string, index: number) => (
+            <View key={index} style={{
+              width: cellWidth,
+              height: headerHeight,
+              borderRightWidth: index < (columns.length - 1) ? 1 : 0,
+              borderRightColor: borderColor || '#000000',
+              justifyContent: 'center',
+              alignItems: 'center',
+              backgroundColor: '#f5f5f5',
+            }}>
+              <Text style={{
+                fontSize: 12,
+                fontWeight: 'bold',
+                color: '#333333',
+                textAlign: 'center',
+              }}>
+                {column}
+              </Text>
+            </View>
+          ))}
+        </View>
+        
+        {/* Table Rows */}
+        {rows?.map((row: string[], rowIndex: number) => (
+          <View key={rowIndex} style={{
+            flexDirection: 'row',
+            height: rowHeight,
+            borderBottomWidth: rowIndex < (rows.length - 1) ? 1 : 0,
+            borderBottomColor: borderColor || '#000000',
+          }}>
+            {row.map((cell: string, cellIndex: number) => (
+              <View key={cellIndex} style={{
+                width: cellWidth,
+                height: rowHeight,
+                borderRightWidth: cellIndex < (row.length - 1) ? 1 : 0,
+                borderRightColor: borderColor || '#000000',
+                justifyContent: 'center',
+                alignItems: 'center',
+              }}>
+                <Text style={{
+                  fontSize: 11,
+                  color: '#333333',
+                  textAlign: 'center',
+                }}>
+                  {cell}
+                </Text>
+              </View>
+            ))}
+          </View>
+        ))}
+      </View>
+    );
+  };
+
+  return (
+    <Animated.View
+      {...panResponder.panHandlers}
+      style={{
+        position: 'absolute',
+        zIndex: selected ? 2 : 1,
+        borderWidth: selected ? 3 : 0,
+        borderColor: selected ? '#007AFF' : 'transparent',
+        borderRadius: 8,
+        backgroundColor: selected ? 'rgba(0, 122, 255, 0.1)' : 'transparent',
+        transform: pan.getTranslateTransform(),
+      }}
+    >
+      {renderTable()}
+      {selected && [
+        // Corner handles
+        { handle: 'topLeft', x: 0, y: 0, type: 'corner' as const },
+        { handle: 'topRight', x: table.width || 300, y: 0, type: 'corner' as const },
+        { handle: 'bottomRight', x: table.width || 300, y: table.height || 200, type: 'corner' as const },
+        { handle: 'bottomLeft', x: 0, y: table.height || 200, type: 'corner' as const },
+        // Side handles
+        { handle: 'top', x: (table.width || 300) / 2, y: 0, type: 'side' as const },
+        { handle: 'right', x: table.width || 300, y: (table.height || 200) / 2, type: 'side' as const },
+        { handle: 'bottom', x: (table.width || 300) / 2, y: table.height || 200, type: 'side' as const },
+        { handle: 'left', x: 0, y: (table.height || 200) / 2, type: 'side' as const },
+      ].map(({ handle, x, y, type }) => (
+        <ResizeHandle
+          key={handle}
+          x={x}
+          y={y}
+          onResize={(dx, dy) => handleResize(handle, dx, dy)}
+          type={type}
+        />
+      ))}
+    </Animated.View>
+  );
+};
+
 const TemplateEditScreen = () => {
   const params = useLocalSearchParams();
   const router = useRouter();
@@ -509,6 +1134,7 @@ const TemplateEditScreen = () => {
   const [selectedShape, setSelectedShape] = useState<string | null>(null);
   const [selectedText, setSelectedText] = useState<string | null>(null);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  const [selectedTable, setSelectedTable] = useState<string | null>(null);
   const [showToolbox, setShowToolbox] = useState(false);
   const [showToolsToolbox, setShowToolsToolbox] = useState(false);
   const [showShapePicker, setShowShapePicker] = useState(false);
@@ -519,6 +1145,14 @@ const TemplateEditScreen = () => {
   const [showNoteModal, setShowNoteModal] = useState(false);
   const [noteText, setNoteText] = useState('');
   const [templateName, setTemplateName] = useState('Template Edit');
+  const [showTableEditor, setShowTableEditor] = useState(false);
+  const [editingTable, setEditingTable] = useState<any>(null);
+  const [currentColorPickerTarget, setCurrentColorPickerTarget] = useState<'shape' | 'text' | 'canvas' | 'draw' | 'table'>('shape');
+  const [showTextEditor, setShowTextEditor] = useState(false);
+  const [editingText, setEditingText] = useState<any>(null);
+  const [showTextColorPicker, setShowTextColorPicker] = useState(false);
+  const [showFontSizeSlider, setShowFontSizeSlider] = useState(false);
+  const [showFontFamilyPicker, setShowFontFamilyPicker] = useState(false);
   const ignoreNextCanvasPress = React.useRef(false);
   const viewShotRef = useRef(null);
 
@@ -531,7 +1165,7 @@ const TemplateEditScreen = () => {
     if (params.templateName) {
       setTemplateName(params.templateName as string);
     }
-    // Load elements and canvas background color if editing a recent design
+    // Only load elements if the store is empty and we have elements to load
     if (params.elements && designStore.elements.length === 0) {
       try {
         const parsedElements = JSON.parse(params.elements as string);
@@ -540,6 +1174,7 @@ const TemplateEditScreen = () => {
         // ignore
       }
     }
+    // Only set canvas background color if store is empty and we have a color
     if (params.canvasBgColor && designStore.elements.length === 0) {
       designStore.setCanvasBackgroundColor(params.canvasBgColor as string);
     }
@@ -585,6 +1220,25 @@ const TemplateEditScreen = () => {
           };
           designStore.addElement(newImage);
         }
+        break;
+      case 'table':
+        const newTable = {
+          id: `table_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+          type: 'table' as const,
+          x: 50,
+          y: 50,
+          width: 300,
+          height: 200,
+          title: 'New Table',
+          columns: ['Column 1', 'Column 2'],
+          rows: [['Row 1, Col 1', 'Row 1, Col 2']],
+          backgroundColor: '#ffffff',
+          borderColor: '#000000',
+          titleBackgroundColor: '#4CAF50', // Added default title background color
+          selected: false,
+        };
+        designStore.addElement(newTable);
+        setSelectedTable(newTable.id);
         break;
       case 'color':
         setShowColorPicker(true);
@@ -633,6 +1287,7 @@ const TemplateEditScreen = () => {
     setSelectedShape(null);
     setSelectedText(null);
     setSelectedImage(null);
+    setSelectedTable(null);
   };
 
   const handleShapePress = (id: string, e?: GestureResponderEvent) => {
@@ -649,6 +1304,80 @@ const TemplateEditScreen = () => {
     setSelectedImage(id);
     setSelectedShape(null);
     setSelectedText(null);
+  };
+
+  const handleTablePress = (id: string, e?: GestureResponderEvent) => {
+    ignoreNextCanvasPress.current = true;
+    designStore.selectElement(id);
+    setSelectedTable(id);
+    setSelectedShape(null);
+    setSelectedText(null);
+    setSelectedImage(null);
+  };
+
+  const handleTableEdit = (tableId: string) => {
+    const table = elements.find(el => el.id === tableId);
+    if (table && table.type === 'table') {
+      setEditingTable(table);
+      setShowTableEditor(true);
+    }
+  };
+
+  const handleTableSave = () => {
+    if (editingTable) {
+      designStore.updateElement(editingTable.id, {
+        title: editingTable.title,
+        columns: editingTable.columns,
+        rows: editingTable.rows,
+        titleBackgroundColor: editingTable.titleBackgroundColor,
+      } as any);
+      setShowTableEditor(false);
+      setEditingTable(null);
+    }
+  };
+
+  const addTableColumn = () => {
+    if (editingTable) {
+      const newColumns = [...editingTable.columns, `Column ${editingTable.columns.length + 1}`];
+      const newRows = editingTable.rows.map((row: string[]) => [...row, '']);
+      setEditingTable({
+        ...editingTable,
+        columns: newColumns,
+        rows: newRows,
+      });
+    }
+  };
+
+  const removeTableColumn = (columnIndex: number) => {
+    if (editingTable && editingTable.columns.length > 1) {
+      const newColumns = editingTable.columns.filter((_: any, index: number) => index !== columnIndex);
+      const newRows = editingTable.rows.map((row: string[]) => row.filter((_: any, index: number) => index !== columnIndex));
+      setEditingTable({
+        ...editingTable,
+        columns: newColumns,
+        rows: newRows,
+      });
+    }
+  };
+
+  const addTableRow = () => {
+    if (editingTable) {
+      const newRow = editingTable.columns.map(() => '');
+      setEditingTable({
+        ...editingTable,
+        rows: [...editingTable.rows, newRow],
+      });
+    }
+  };
+
+  const removeTableRow = (rowIndex: number) => {
+    if (editingTable && editingTable.rows.length > 1) {
+      const newRows = editingTable.rows.filter((_: any, index: number) => index !== rowIndex);
+      setEditingTable({
+        ...editingTable,
+        rows: newRows,
+      });
+    }
   };
 
   const updateShapePosition = (id: string, newX: number, newY: number) => {
@@ -689,7 +1418,30 @@ const TemplateEditScreen = () => {
     designStore.updateElement(id, { x: newX, y: newY });
   };
 
-  const updateImageSize = (id: string, newWidth: number, newHeight: number, newX: number, newY: number) => {
+  const updateImageSize = React.useCallback((id: string, newWidth: number, newHeight: number, newX: number, newY: number) => {
+    // Get current element to check if update is needed
+    const currentElement = elements.find(el => el.id === id);
+    if (currentElement) {
+      // Only update if there are actual changes
+      if (currentElement.width === newWidth && currentElement.height === newHeight && 
+          currentElement.x === newX && currentElement.y === newY) {
+        return;
+      }
+    }
+    
+    designStore.updateElement(id, { 
+      width: newWidth, 
+      height: newHeight, 
+      x: newX, 
+      y: newY 
+    });
+  }, [elements, designStore]);
+
+  const updateTablePosition = (id: string, newX: number, newY: number) => {
+    designStore.updateElement(id, { x: newX, y: newY });
+  };
+
+  const updateTableSize = (id: string, newWidth: number, newHeight: number, newX: number, newY: number) => {
     designStore.updateElement(id, { 
       width: newWidth, 
       height: newHeight, 
@@ -705,6 +1457,13 @@ const TemplateEditScreen = () => {
     }
   };
 
+  const deleteSelectedTable = () => {
+    if (selectedTable !== null) {
+      designStore.deleteElement(selectedTable);
+      setSelectedTable(null);
+    }
+  };
+
   const deleteSelectedElement = () => {
     if (selectedShape !== null) {
       deleteSelectedShape();
@@ -712,6 +1471,33 @@ const TemplateEditScreen = () => {
       deleteSelectedText();
     } else if (selectedImage !== null) {
       deleteSelectedImage();
+    } else if (selectedTable !== null) {
+      deleteSelectedTable();
+    }
+  };
+
+  // Layer ordering functions
+  const bringToFront = () => {
+    if (selectedShape !== null) {
+      designStore.bringToFront(selectedShape);
+    } else if (selectedText !== null) {
+      designStore.bringToFront(selectedText);
+    } else if (selectedImage !== null) {
+      designStore.bringToFront(selectedImage);
+    } else if (selectedTable !== null) {
+      designStore.bringToFront(selectedTable);
+    }
+  };
+
+  const sendToBack = () => {
+    if (selectedShape !== null) {
+      designStore.sendToBack(selectedShape);
+    } else if (selectedText !== null) {
+      designStore.sendToBack(selectedText);
+    } else if (selectedImage !== null) {
+      designStore.sendToBack(selectedImage);
+    } else if (selectedTable !== null) {
+      designStore.sendToBack(selectedTable);
     }
   };
 
@@ -827,6 +1613,108 @@ const TemplateEditScreen = () => {
     height: canvasDimensions.height,
   };
 
+  const handleTextEdit = (textId: string) => {
+    const textElement = elements.find(el => el.id === textId);
+    if (textElement && textElement.type === 'text') {
+      setEditingText(textElement);
+      setShowTextEditor(true);
+    }
+  };
+
+  const handleTextColorChange = (color: string) => {
+    if (selectedText !== null) {
+      designStore.updateElement(selectedText, { color: color });
+    }
+    setShowTextColorPicker(false);
+  };
+
+  const handleFontSizeChange = (fontSize: number) => {
+    if (selectedText !== null) {
+      designStore.updateElement(selectedText, { fontSize: fontSize });
+    }
+  };
+
+  const handleFontFamilyChange = (fontFamily: string) => {
+    if (selectedText !== null) {
+      designStore.updateElement(selectedText, { fontFamily: fontFamily });
+    }
+    setShowFontFamilyPicker(false);
+  };
+
+  const handleTextSave = () => {
+    if (editingText && editingText.text.trim()) {
+      designStore.updateElement(editingText.id, { text: editingText.text });
+      setShowTextEditor(false);
+      setEditingText(null);
+    }
+  };
+
+  const updateTextSize = React.useCallback((id: string, newWidth: number, newHeight: number, newX: number, newY: number) => {
+    console.log('updateTextSize called:', { id, newWidth, newHeight, newX, newY });
+    
+    // Get current element to check if update is needed
+    const currentElement = elements.find(el => el.id === id);
+    if (currentElement) {
+      console.log('Current element:', { 
+        width: currentElement.width, 
+        height: currentElement.height, 
+        x: currentElement.x, 
+        y: currentElement.y 
+      });
+      
+      // Only update if there are actual changes
+      if (currentElement.width === newWidth && currentElement.height === newHeight && 
+          currentElement.x === newX && currentElement.y === newY) {
+        console.log('No changes detected, skipping update');
+        return;
+      }
+    }
+    
+    // Calculate new font size based on new container dimensions with better algorithm
+    const minDimension = Math.min(newWidth, newHeight);
+    const maxDimension = Math.max(newWidth, newHeight);
+    const aspectRatio = newWidth / newHeight;
+    const textLength = (currentElement as any)?.text?.length || 0;
+    
+    // Base font size calculation
+    let newFontSize = Math.max(6, Math.min(60, minDimension * 0.35));
+    
+    // Adjust based on aspect ratio
+    if (aspectRatio > 3) {
+      newFontSize *= 0.8;
+    } else if (aspectRatio < 0.5) {
+      newFontSize *= 1.1;
+    }
+    
+    // Adjust for text length
+    if (textLength > 100) {
+      newFontSize *= 0.6;
+    } else if (textLength > 50) {
+      newFontSize *= 0.75;
+    } else if (textLength > 20) {
+      newFontSize *= 0.85;
+    } else if (textLength < 5) {
+      newFontSize *= 1.2;
+    }
+    
+    // Ensure bounds
+    newFontSize = Math.max(6, Math.min(60, newFontSize));
+    
+    console.log('Updating text element with new dimensions and font size:', { 
+      newFontSize: Math.round(newFontSize),
+      aspectRatio: aspectRatio.toFixed(2),
+      textLength 
+    });
+    
+    designStore.updateElement(id, { 
+      width: newWidth, 
+      height: newHeight, 
+      x: newX, 
+      y: newY,
+      fontSize: Math.round(newFontSize) // Update font size based on new container size
+    });
+  }, [elements, designStore]);
+
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
@@ -878,6 +1766,17 @@ const TemplateEditScreen = () => {
         </View>
       )}
 
+      {selectedTable && (
+        <View style={{ alignItems: 'center', marginVertical: 8 }}>
+          <TouchableOpacity
+            style={{ backgroundColor: '#4CAF50', paddingVertical: 8, paddingHorizontal: 20, borderRadius: 8 }}
+            onPress={() => handleTableEdit(selectedTable)}
+          >
+            <Text style={{ color: '#fff', fontWeight: 'bold' }}>Edit Table</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
       {/* Canvas */}
       <View style={styles.canvasContainer}>
         <ViewShot ref={viewShotRef} options={{ format: 'png', quality: 1 }} style={{ alignItems: 'center', justifyContent: 'center' }}>
@@ -901,10 +1800,10 @@ const TemplateEditScreen = () => {
             onTouchEnd={handleCanvasPress}
           >
             {/* Selection indicator */}
-            {(selectedShape || selectedText || selectedImage) && (
+            {(selectedShape || selectedText || selectedImage || selectedTable) && (
               <View style={styles.selectionIndicator}>
                 <Text style={styles.selectionText}>
-                  {selectedShape ? 'Shape Selected' : selectedText ? 'Text Selected' : 'Image Selected'}
+                  {selectedShape ? 'Shape Selected' : selectedText ? 'Text Selected' : selectedImage ? 'Image Selected' : 'Table Selected'}
                 </Text>
               </View>
             )}
@@ -942,6 +1841,8 @@ const TemplateEditScreen = () => {
                     draggable={true}
                     updatePosition={(x, y) => updateTextPosition(element.id, x / scaleFactor, y / scaleFactor)}
                     canvasLayout={canvasLayout}
+                    onDoubleTap={() => handleTextEdit(element.id)}
+                    updateSize={(id, width, height, x, y) => updateTextSize(id, width / scaleFactor, height / scaleFactor, x / scaleFactor, y / scaleFactor)}
                   />
                 );
               } else if (element.type === 'image') {
@@ -954,7 +1855,20 @@ const TemplateEditScreen = () => {
                     draggable={true}
                     updatePosition={(x, y) => updateImagePosition(element.id, x / scaleFactor, y / scaleFactor)}
                     canvasLayout={canvasLayout}
-                    updateSize={(id, width, height, x, y) => updateImageSize(element.id, width / scaleFactor, height / scaleFactor, x / scaleFactor, y / scaleFactor)}
+                    updateSize={(id, width, height, x, y) => updateImageSize(id, width / scaleFactor, height / scaleFactor, x / scaleFactor, y / scaleFactor)}
+                  />
+                );
+              } else if (element.type === 'table') {
+                return (
+                  <TableOnCanvas
+                    key={element.id}
+                    table={scaledElement}
+                    selected={selectedElements.includes(element.id)}
+                    onPress={() => handleTablePress(element.id, undefined)}
+                    draggable={true}
+                    updatePosition={(x, y) => updateTablePosition(element.id, x / scaleFactor, y / scaleFactor)}
+                    canvasLayout={canvasLayout}
+                    updateSize={(id, width, height, x, y) => updateTableSize(element.id, width / scaleFactor, height / scaleFactor, x / scaleFactor, y / scaleFactor)}
                   />
                 );
               }
@@ -992,24 +1906,30 @@ const TemplateEditScreen = () => {
         <TouchableOpacity
           style={styles.toolbarButton}
           onPress={deleteSelectedElement}
-          disabled={!selectedShape && !selectedText && !selectedImage}
+          disabled={!selectedShape && !selectedText && !selectedImage && !selectedTable}
         >
           <Ionicons 
             name="trash" 
             size={24} 
-            color={selectedShape || selectedText || selectedImage ? '#FF3B30' : colors.textSecondary} 
+            color={selectedShape || selectedText || selectedImage || selectedTable ? '#FF3B30' : colors.textSecondary} 
           />
         </TouchableOpacity>
         
         <TouchableOpacity
           style={styles.toolbarButton}
-          onPress={() => setShowColorPicker(true)}
-          disabled={!selectedShape}
+          onPress={() => {
+            if (selectedText) {
+              setShowTextColorPicker(true);
+            } else if (selectedShape) {
+              setShowColorPicker(true);
+            }
+          }}
+          disabled={!selectedShape && !selectedText}
         >
           <Ionicons 
             name="color-palette" 
             size={24} 
-            color={selectedShape ? colors.text : colors.textSecondary} 
+            color={selectedShape || selectedText ? colors.text : colors.textSecondary} 
           />
         </TouchableOpacity>
         
@@ -1019,6 +1939,56 @@ const TemplateEditScreen = () => {
         >
           <Ionicons name="color-fill" size={24} color={colors.text} />
         </TouchableOpacity>
+        
+        <TouchableOpacity
+          style={styles.toolbarButton}
+          onPress={bringToFront}
+          disabled={!selectedShape && !selectedText && !selectedImage && !selectedTable}
+        >
+          <Ionicons 
+            name="arrow-up" 
+            size={24} 
+            color={selectedShape || selectedText || selectedImage || selectedTable ? '#f39c12' : colors.textSecondary} 
+          />
+        </TouchableOpacity>
+        
+        <TouchableOpacity
+          style={styles.toolbarButton}
+          onPress={sendToBack}
+          disabled={!selectedShape && !selectedText && !selectedImage && !selectedTable}
+        >
+          <Ionicons 
+            name="arrow-down" 
+            size={24} 
+            color={selectedShape || selectedText || selectedImage || selectedTable ? '#f39c12' : colors.textSecondary} 
+          />
+        </TouchableOpacity>
+        
+        {/* Text editing buttons - only show when text is selected */}
+        {selectedText && (
+          <>
+            <TouchableOpacity
+              style={styles.toolbarButton}
+              onPress={() => handleTextEdit(selectedText)}
+            >
+              <Ionicons name="create" size={24} color={colors.text} />
+            </TouchableOpacity>
+            
+            <TouchableOpacity
+              style={styles.toolbarButton}
+              onPress={() => setShowFontSizeSlider(true)}
+            >
+              <Ionicons name="text" size={24} color={colors.text} />
+            </TouchableOpacity>
+            
+            <TouchableOpacity
+              style={styles.toolbarButton}
+              onPress={() => setShowFontFamilyPicker(true)}
+            >
+              <Ionicons name="options" size={24} color={colors.text} />
+            </TouchableOpacity>
+          </>
+        )}
       </View>
 
       {/* Toolbox Modal */}
@@ -1055,6 +2025,14 @@ const TemplateEditScreen = () => {
               >
                 <Ionicons name="image" size={32} color={colors.text} />
                 <Text style={[styles.toolboxItemText, { color: colors.text }]}>Image</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity
+                style={styles.toolboxItem}
+                onPress={() => handleToolboxPress('table')}
+              >
+                <Ionicons name="grid-outline" size={32} color={colors.text} />
+                <Text style={[styles.toolboxItemText, { color: colors.text }]}>Table</Text>
               </TouchableOpacity>
               
               <TouchableOpacity
@@ -1123,15 +2101,25 @@ const TemplateEditScreen = () => {
           <View style={[styles.colorPicker, { backgroundColor: colors.surface }]}>
             <Text style={[styles.colorPickerTitle, { color: colors.text }]}>Select Color</Text>
             
-            <View style={styles.colorPickerGrid}>
-              {COLOR_PALETTE.map((color) => (
                 <TouchableOpacity
-                  key={color}
-                  style={[styles.colorPickerItem, { backgroundColor: color }]}
-                  onPress={() => changeShapeColor(color)}
-                />
-              ))}
-            </View>
+              style={{
+                paddingHorizontal: 12,
+                paddingVertical: 8,
+                backgroundColor: '#3478f6',
+                borderRadius: 8,
+                flexDirection: 'row',
+                alignItems: 'center',
+                alignSelf: 'center',
+              }}
+              onPress={() => {
+                setCurrentColorPickerTarget('shape');
+                setShowColorPicker(true);
+                setShowColorPicker(false);
+              }}
+            >
+              <Ionicons name="color-palette" size={16} color="#fff" />
+              <Text style={{ color: '#fff', marginLeft: 4, fontWeight: '600' }}>Choose Color</Text>
+            </TouchableOpacity>
             
             <TouchableOpacity
               style={styles.closeButton}
@@ -1162,9 +2150,12 @@ const TemplateEditScreen = () => {
               }]}
               value={textInputValue}
               onChangeText={setTextInputValue}
-              placeholder="Enter text..."
+              placeholder="Enter text... (Press Enter for new line)"
               placeholderTextColor={colors.textSecondary}
               multiline
+              returnKeyType="default"
+              blurOnSubmit={false}
+              textAlignVertical="top"
             />
             
             <View style={styles.textInputButtons}>
@@ -1198,7 +2189,7 @@ const TemplateEditScreen = () => {
                   }
                 }}
               >
-                <Text style={styles.textInputButtonTextPrimary}>Add</Text>
+                <Text style={styles.textInputButtonTextPrimary}>Save</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -1216,22 +2207,354 @@ const TemplateEditScreen = () => {
           <View style={[styles.colorPicker, { backgroundColor: colors.surface }]}>
             <Text style={[styles.colorPickerTitle, { color: colors.text }]}>Canvas Background</Text>
             
-            <View style={styles.colorPickerGrid}>
-              {COLOR_PALETTE.map((color) => (
                 <TouchableOpacity
-                  key={color}
-                  style={[styles.colorPickerItem, { backgroundColor: color }]}
+              style={{
+                paddingHorizontal: 12,
+                paddingVertical: 8,
+                backgroundColor: '#3478f6',
+                borderRadius: 8,
+                flexDirection: 'row',
+                alignItems: 'center',
+                alignSelf: 'center',
+              }}
                   onPress={() => {
-                    designStore.setCanvasBackgroundColor(color);
+                setCurrentColorPickerTarget('canvas');
+                setShowColorPicker(true);
                     setShowCanvasColorPicker(false);
                   }}
-                />
+            >
+              <Ionicons name="color-palette" size={16} color="#fff" />
+              <Text style={{ color: '#fff', marginLeft: 4, fontWeight: '600' }}>Choose Color</Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity
+              style={styles.closeButton}
+              onPress={() => setShowCanvasColorPicker(false)}
+            >
+              <Text style={styles.closeButtonText}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Table Editor Modal */}
+      <Modal
+        visible={showTableEditor}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowTableEditor(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.tableEditor, { backgroundColor: colors.surface }]}>
+            <Text style={[styles.tableEditorTitle, { color: colors.text }]}>Edit Table</Text>
+            
+            {editingTable && (
+              <View style={styles.tableEditorContent}>
+                {/* Title */}
+                <View style={styles.tableEditorSection}>
+                  <Text style={[styles.tableEditorLabel, { color: colors.text }]}>Title:</Text>
+                  <TextInput
+                    style={[styles.tableEditorInput, { 
+                      backgroundColor: colors.background,
+                      color: colors.text,
+                      borderColor: colors.border
+                    }]}
+                    value={editingTable.title}
+                    onChangeText={(text) => setEditingTable({ ...editingTable, title: text })}
+                    placeholder="Table title"
+                    placeholderTextColor={colors.textSecondary}
+                  />
+                </View>
+
+                {/* Title Background Color */}
+                <View style={styles.tableEditorSection}>
+                  <Text style={[styles.tableEditorLabel, { color: colors.text }]}>Title Background Color:</Text>
+                      <TouchableOpacity
+                    style={{
+                      paddingHorizontal: 12,
+                      paddingVertical: 8,
+                      backgroundColor: '#3478f6',
+                      borderRadius: 8,
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      alignSelf: 'center',
+                    }}
+                    onPress={() => {
+                      setCurrentColorPickerTarget('table');
+                      setShowColorPicker(true);
+                      setShowTableEditor(false);
+                    }}
+                  >
+                    <Ionicons name="color-palette" size={16} color="#fff" />
+                    <Text style={{ color: '#fff', marginLeft: 4, fontWeight: '600' }}>Choose Color</Text>
+                  </TouchableOpacity>
+                </View>
+
+                {/* Columns */}
+                <View style={styles.tableEditorSection}>
+                  <View style={styles.tableEditorHeader}>
+                    <Text style={[styles.tableEditorLabel, { color: colors.text }]}>Columns:</Text>
+                    <TouchableOpacity
+                      style={styles.addButton}
+                      onPress={addTableColumn}
+                    >
+                      <Ionicons name="add" size={20} color="#4CAF50" />
+                    </TouchableOpacity>
+                  </View>
+                  {editingTable.columns.map((column: string, index: number) => (
+                    <View key={index} style={styles.tableEditorRow}>
+                      <TextInput
+                        style={[styles.tableEditorInput, { 
+                          backgroundColor: colors.background,
+                          color: colors.text,
+                          borderColor: colors.border,
+                          flex: 1
+                        }]}
+                        value={column}
+                        onChangeText={(text) => {
+                          const newColumns = [...editingTable.columns];
+                          newColumns[index] = text;
+                          setEditingTable({ ...editingTable, columns: newColumns });
+                        }}
+                        placeholder={`Column ${index + 1}`}
+                        placeholderTextColor={colors.textSecondary}
+                      />
+                      {editingTable.columns.length > 1 && (
+                        <TouchableOpacity
+                          style={styles.removeButton}
+                          onPress={() => removeTableColumn(index)}
+                        >
+                          <Ionicons name="close" size={20} color="#FF3B30" />
+                        </TouchableOpacity>
+                      )}
+                    </View>
+                  ))}
+                </View>
+
+                {/* Rows */}
+                <View style={styles.tableEditorSection}>
+                  <View style={styles.tableEditorHeader}>
+                    <Text style={[styles.tableEditorLabel, { color: colors.text }]}>Rows:</Text>
+                    <TouchableOpacity
+                      style={styles.addButton}
+                      onPress={addTableRow}
+                    >
+                      <Ionicons name="add" size={20} color="#4CAF50" />
+                    </TouchableOpacity>
+                  </View>
+                  {editingTable.rows.map((row: string[], rowIndex: number) => (
+                    <View key={rowIndex} style={styles.tableEditorRow}>
+                      {row.map((cell: string, cellIndex: number) => (
+                        <TextInput
+                          key={cellIndex}
+                          style={[styles.tableEditorCellInput, { 
+                            backgroundColor: colors.background,
+                            color: colors.text,
+                            borderColor: colors.border
+                          }]}
+                          value={cell}
+                          onChangeText={(text) => {
+                            const newRows = [...editingTable.rows];
+                            newRows[rowIndex] = [...newRows[rowIndex]];
+                            newRows[rowIndex][cellIndex] = text;
+                            setEditingTable({ ...editingTable, rows: newRows });
+                          }}
+                          placeholder={`Cell ${rowIndex + 1}-${cellIndex + 1}`}
+                          placeholderTextColor={colors.textSecondary}
+                        />
+                      ))}
+                      {editingTable.rows.length > 1 && (
+                        <TouchableOpacity
+                          style={styles.removeButton}
+                          onPress={() => removeTableRow(rowIndex)}
+                        >
+                          <Ionicons name="close" size={20} color="#FF3B30" />
+                        </TouchableOpacity>
+                      )}
+                    </View>
+                  ))}
+                </View>
+              </View>
+            )}
+            
+            <View style={styles.tableEditorButtons}>
+              <TouchableOpacity
+                style={styles.tableEditorButton}
+                onPress={() => setShowTableEditor(false)}
+              >
+                <Text style={styles.tableEditorButtonText}>Cancel</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity
+                style={[styles.tableEditorButton, styles.tableEditorButtonPrimary]}
+                onPress={handleTableSave}
+              >
+                <Text style={styles.tableEditorButtonTextPrimary}>Save</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Color Spectrum Picker */}
+      <ColorSpectrumPicker
+        visible={showColorPicker}
+        onClose={() => setShowColorPicker(false)}
+        onColorSelect={(color) => {
+          if (currentColorPickerTarget === 'shape') {
+            changeShapeColor(color);
+          } else if (currentColorPickerTarget === 'canvas') {
+            designStore.setCanvasBackgroundColor(color);
+          } else if (currentColorPickerTarget === 'table') {
+            setEditingTable({ ...editingTable, titleBackgroundColor: color });
+            setShowTableEditor(true);
+          } else if (currentColorPickerTarget === 'text') {
+            handleTextColorChange(color);
+          }
+          setShowColorPicker(false);
+        }}
+        initialColor="#1976D2"
+      />
+
+      {/* Text Editor Modal */}
+      <Modal
+        visible={showTextEditor}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowTextEditor(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.textEditor, { backgroundColor: colors.surface }]}>
+            <Text style={[styles.textEditorTitle, { color: colors.text }]}>Edit Text</Text>
+            
+            <TextInput
+              style={[styles.textEditorInput, { 
+                backgroundColor: colors.background,
+                color: colors.text,
+                borderColor: colors.border
+              }]}
+              value={editingText?.text || ''}
+              onChangeText={(text) => setEditingText({ ...editingText, text })}
+              placeholder="Enter text..."
+              placeholderTextColor={colors.textSecondary}
+              multiline
+              returnKeyType="default"
+              blurOnSubmit={false}
+              textAlignVertical="top"
+            />
+            
+            <View style={styles.textEditorButtons}>
+              <TouchableOpacity
+                style={styles.textEditorButton}
+                onPress={() => setShowTextEditor(false)}
+              >
+                <Text style={styles.textEditorButtonText}>Cancel</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity
+                style={[styles.textEditorButton, styles.textEditorButtonPrimary]}
+                onPress={handleTextSave}
+              >
+                <Text style={styles.textEditorButtonTextPrimary}>Save</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Text Color Picker Modal */}
+      <Modal
+        visible={showTextColorPicker}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowTextColorPicker(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.colorPicker, { backgroundColor: colors.surface }]}>
+            <Text style={[styles.colorPickerTitle, { color: colors.text }]}>Text Color</Text>
+            
+            <View style={styles.colorPickerGrid}>
+              {TEXT_COLORS.map((color) => (
+                <TouchableOpacity
+                  key={color}
+                  style={styles.colorPickerItem}
+                  onPress={() => handleTextColorChange(color)}
+                >
+                  <View style={[styles.colorPreview, { backgroundColor: color }]} />
+                </TouchableOpacity>
               ))}
             </View>
             
             <TouchableOpacity
               style={styles.closeButton}
-              onPress={() => setShowCanvasColorPicker(false)}
+              onPress={() => setShowTextColorPicker(false)}
+            >
+              <Text style={styles.closeButtonText}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Font Size Slider Modal */}
+      <Modal
+        visible={showFontSizeSlider}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowFontSizeSlider(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.sliderContainer, { backgroundColor: colors.surface }]}>
+            <Text style={[styles.sliderLabel, { color: colors.text }]}>Font Size</Text>
+            <Slider
+              style={styles.slider}
+              minimumValue={12}
+              maximumValue={36}
+              value={(elements.find(el => el.id === selectedText) as any)?.fontSize || 16}
+              onValueChange={(value) => handleFontSizeChange(value)}
+              minimumTrackTintColor="#3478f6"
+              maximumTrackTintColor="#ddd"
+            />
+            <View style={styles.sliderValue}>
+              <Text style={styles.sliderValueText}>{(elements.find(el => el.id === selectedText) as any)?.fontSize || 16}</Text>
+            </View>
+            <TouchableOpacity
+              style={styles.closeButton}
+              onPress={() => setShowFontSizeSlider(false)}
+            >
+              <Text style={styles.closeButtonText}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Font Family Picker Modal */}
+      <Modal
+        visible={showFontFamilyPicker}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowFontFamilyPicker(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.fontFamilyPicker, { backgroundColor: colors.surface }]}>
+            <Text style={[styles.fontFamilyPickerTitle, { color: colors.text }]}>Font Family</Text>
+            
+            <View style={styles.fontFamilyPickerGrid}>
+              {FONT_FAMILIES.map((fontFamily) => (
+                <TouchableOpacity
+                  key={fontFamily}
+                  style={styles.fontFamilyPickerItem}
+                  onPress={() => handleFontFamilyChange(fontFamily)}
+                >
+                  <Text style={[styles.fontFamilyPickerItemText, { color: colors.text }]}>
+                    {fontFamily}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+            
+            <TouchableOpacity
+              style={styles.closeButton}
+              onPress={() => setShowFontFamilyPicker(false)}
             >
               <Text style={styles.closeButtonText}>Cancel</Text>
             </TouchableOpacity>
@@ -1393,6 +2716,305 @@ const styles = StyleSheet.create({
     margin: 5,
     borderWidth: 2,
     borderColor: '#E0E0E0',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  colorPreview: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+  },
+  sliderContainer: {
+    width: '90%',
+    maxWidth: 400,
+    borderRadius: 16,
+    padding: 20,
+  },
+  slider: {
+    width: '100%',
+    height: 40,
+  },
+  colorPickerButtons: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 20,
+  },
+  cancelButton: {
+    flex: 1,
+    padding: 12,
+    borderRadius: 8,
+    backgroundColor: '#E0E0E0',
+    marginRight: 10,
+    alignItems: 'center',
+  },
+  applyButton: {
+    flex: 1,
+    padding: 12,
+    borderRadius: 8,
+    backgroundColor: '#3478f6',
+    marginLeft: 10,
+    alignItems: 'center',
+  },
+  cancelButtonText: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  applyButtonText: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#fff',
+  },
+  closeButtonText: {
+    color: '#FFF',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  selectionIndicator: {
+    position: 'absolute',
+    top: 10,
+    right: 10,
+    backgroundColor: 'rgba(0, 122, 255, 0.9)',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    zIndex: 10,
+  },
+  selectionText: {
+    color: '#FFF',
+    fontSize: 12,
+    fontWeight: 'bold',
+  },
+  tableEditor: {
+    width: '90%',
+    maxWidth: 500,
+    borderRadius: 16,
+    padding: 20,
+    maxHeight: '80%', // Limit height to 80% of screen
+  },
+  tableEditorTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    textAlign: 'center',
+    marginBottom: 20,
+  },
+  tableEditorContent: {
+    maxHeight: 400,
+  },
+  tableEditorSection: {
+    marginBottom: 20,
+  },
+  tableEditorLabel: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginBottom: 8,
+  },
+  tableEditorInput: {
+    borderWidth: 1,
+    borderRadius: 8,
+    padding: 12,
+    fontSize: 16,
+  },
+  tableEditorHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  addButton: {
+    padding: 8,
+  },
+  tableEditorRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  tableEditorCellInput: {
+    borderWidth: 1,
+    borderRadius: 8,
+    padding: 8,
+    fontSize: 14,
+    marginRight: 8,
+    flex: 1,
+  },
+  removeButton: {
+    padding: 8,
+  },
+  tableEditorButtons: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 20,
+  },
+  tableEditorButton: {
+    flex: 1,
+    padding: 12,
+    borderRadius: 8,
+    backgroundColor: '#E0E0E0',
+    marginHorizontal: 5,
+    alignItems: 'center',
+  },
+  tableEditorButtonPrimary: {
+    backgroundColor: '#007AFF',
+  },
+  tableEditorButtonText: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  tableEditorButtonTextPrimary: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#FFF',
+  },
+  selectedColor: {
+    borderWidth: 2,
+    borderColor: '#007AFF',
+  },
+  textEditor: {
+    width: '90%',
+    maxWidth: 500,
+    borderRadius: 16,
+    padding: 20,
+    maxHeight: '80%', // Limit height to 80% of screen
+  },
+  textEditorTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    textAlign: 'center',
+    marginBottom: 20,
+  },
+  textEditorInput: {
+    borderWidth: 1,
+    borderRadius: 8,
+    padding: 12,
+    fontSize: 16,
+    marginBottom: 20,
+    minHeight: 120,
+    maxHeight: 200,
+    textAlignVertical: 'top',
+    lineHeight: 20,
+  },
+  textEditorButtons: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  textEditorButton: {
+    flex: 1,
+    padding: 12,
+    borderRadius: 8,
+    backgroundColor: '#E0E0E0',
+    marginHorizontal: 5,
+    alignItems: 'center',
+  },
+  textEditorButtonPrimary: {
+    backgroundColor: '#007AFF',
+  },
+  textEditorButtonText: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  textEditorButtonTextPrimary: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#FFF',
+  },
+  sliderValue: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 10,
+  },
+  sliderValueText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#333',
+  },
+  fontFamilyPicker: {
+    width: '90%',
+    maxWidth: 400,
+    borderRadius: 16,
+    padding: 20,
+  },
+  fontFamilyPickerTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    textAlign: 'center',
+    marginBottom: 20,
+  },
+  fontFamilyPickerGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-around',
+    marginBottom: 20,
+  },
+  fontFamilyPickerItem: {
+    alignItems: 'center',
+    padding: 15,
+    borderRadius: 8,
+    minWidth: 80,
+  },
+  fontFamilyPickerItemText: {
+    marginTop: 8,
+    fontSize: 12,
+    textAlign: 'center',
+  },
+  slider: {
+    width: '100%',
+    height: 40,
+  },
+  closeButton: {
+    backgroundColor: '#007AFF',
+    padding: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  closeButtonText: {
+    color: '#FFF',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  // ColorSpectrumPicker styles
+  colorPickerOverlay: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.5)',
+  },
+  colorPickerContainer: {
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    padding: 20,
+    width: 320,
+    maxWidth: '90%',
+  },
+  colorSpectrumPickerTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    textAlign: 'center',
+    marginBottom: 20,
+    color: '#333',
+  },
+  colorSwatch: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    borderWidth: 2,
+    borderColor: '#ddd',
+    marginRight: 10,
+  },
+  colorHex: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  sliderLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: 5,
   },
   textInputModal: {
     width: '90%',
@@ -1412,8 +3034,10 @@ const styles = StyleSheet.create({
     padding: 12,
     fontSize: 16,
     marginBottom: 20,
-    minHeight: 100,
+    minHeight: 120,
+    maxHeight: 200,
     textAlignVertical: 'top',
+    lineHeight: 20,
   },
   textInputButtons: {
     flexDirection: 'row',
@@ -1439,32 +3063,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: 'bold',
     color: '#FFF',
-  },
-  closeButton: {
-    backgroundColor: '#007AFF',
-    padding: 12,
-    borderRadius: 8,
-    alignItems: 'center',
-  },
-  closeButtonText: {
-    color: '#FFF',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  selectionIndicator: {
-    position: 'absolute',
-    top: 10,
-    right: 10,
-    backgroundColor: 'rgba(0, 122, 255, 0.9)',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 16,
-    zIndex: 10,
-  },
-  selectionText: {
-    color: '#FFF',
-    fontSize: 12,
-    fontWeight: 'bold',
   },
 });
 

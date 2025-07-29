@@ -44,9 +44,24 @@ export interface ImageElement {
   selected: boolean;
 }
 
-export type Element = Shape | TextElement | ImageElement;
+export interface TableElement {
+  id: string;
+  type: 'table';
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  title: string;
+  columns: string[];
+  rows: string[][];
+  backgroundColor: string;
+  borderColor: string;
+  selected: boolean;
+}
 
-export type Tool = 'select' | 'rectangle' | 'circle' | 'ellipse' | 'triangle' | 'line' | 'star' | 'text' | 'image';
+export type Element = Shape | TextElement | ImageElement | TableElement;
+
+export type Tool = 'select' | 'rectangle' | 'circle' | 'ellipse' | 'triangle' | 'line' | 'star' | 'text' | 'image' | 'table';
 
 interface HistoryState {
   past: Element[][];
@@ -72,6 +87,8 @@ interface DesignStore {
   clearSelection: () => void;
   moveElement: (id: string, deltaX: number, deltaY: number) => void;
   resizeElement: (id: string, newWidth: number, newHeight: number) => void;
+  bringToFront: (id: string) => void;
+  sendToBack: (id: string) => void;
   setCanvasBackgroundColor: (color: string) => void;
   setCurrentTool: (tool: Tool) => void;
   setDesignName: (name: string) => void;
@@ -240,6 +257,36 @@ export const useDesignStore = create<DesignStore>()(
         });
       },
 
+      bringToFront: (id: string) => {
+        const { elements, history } = get();
+        const elementToMove = elements.find(el => el.id === id);
+        if (!elementToMove) return;
+        
+        const otherElements = elements.filter(el => el.id !== id);
+        const newElements = [...otherElements, elementToMove];
+        const newHistory = addToHistory(history, newElements);
+        
+        set({ 
+          elements: newElements,
+          history: newHistory,
+        });
+      },
+
+      sendToBack: (id: string) => {
+        const { elements, history } = get();
+        const elementToMove = elements.find(el => el.id === id);
+        if (!elementToMove) return;
+        
+        const otherElements = elements.filter(el => el.id !== id);
+        const newElements = [elementToMove, ...otherElements];
+        const newHistory = addToHistory(history, newElements);
+        
+        set({ 
+          elements: newElements,
+          history: newHistory,
+        });
+      },
+
       setCanvasBackgroundColor: (color: string) => {
         set({ canvasBackgroundColor: color });
       },
@@ -396,9 +443,12 @@ export const useDesignStore = create<DesignStore>()(
       },
 
       setElements: (elements: Element[]) => {
-        // Ensure all elements have unique IDs
+        // Only generate new IDs if there are actual conflicts
         const elementsWithUniqueIds = elements.map((element, index) => {
-          if (!element.id || elements.filter(el => el.id === element.id).length > 1) {
+          // Check if this ID already exists in the current elements array
+          const existingElement = elements.find(el => el.id === element.id && el !== element);
+          if (existingElement) {
+            // Only regenerate if there's a conflict
             const uniqueId = `${element.type}_${Date.now()}_${index}_${Math.random().toString(36).substr(2, 9)}`;
             return { ...element, id: uniqueId };
           }

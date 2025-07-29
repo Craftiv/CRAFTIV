@@ -248,7 +248,7 @@ export default function TimerScreen() {
             borderColor: 'rgba(163,139,255,0.25)',
             backgroundColor: 'rgba(255,255,255,0.25)',
           }}>
-            <Text style={{ fontSize: 22, fontWeight: 'bold', color: '#6366F1', marginBottom: 6 }}>⏰ Time’s Up!</Text>
+            <Text style={{ fontSize: 22, fontWeight: 'bold', color: '#6366F1', marginBottom: 6 }}>⏰ Time&apos;s Up!</Text>
             <Text style={{ fontSize: 16, color: '#23235B', marginBottom: 16, textAlign: 'center' }}>
               Your timer session has ended. Would you like to add more time?
             </Text>
@@ -306,7 +306,7 @@ export default function TimerScreen() {
           <Ionicons name="arrow-back" size={28} color="#23235B" />
         </TouchableOpacity>
         <Text style={styles.title}>Design Timer</Text>
-        <View style={{ width: 28 }} /> {/* Spacer for symmetry */}
+        <View style={{ width: 28 }} />
       </View>
       {/* Hours/Minutes Selection Section */}
       <View style={styles.timeSelectRow}>
@@ -395,7 +395,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     width: '100%',
     paddingHorizontal: 16,
-    paddingTop: 40,
+    paddingTop: 60,
     paddingBottom: 20,
     backgroundColor: 'transparent',
   },
@@ -511,6 +511,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#F7F4FF',
     paddingVertical: 4,
     paddingHorizontal: 0,
+    paddingBottom: 80,
   },
   menuItem: {
     flexDirection: 'row',
@@ -582,7 +583,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   timeTextGlass: {
-    fontSize: 64,
+    fontSize: 48,
     fontWeight: 'bold',
     color: '#23235B',
     letterSpacing: 2,

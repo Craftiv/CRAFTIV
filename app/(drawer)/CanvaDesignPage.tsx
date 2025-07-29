@@ -23,11 +23,153 @@ if (Platform.OS === 'web') {
 
 type IoniconsName = React.ComponentProps<typeof Ionicons>["name"];
 
-const COLOR_PALETTE: string[] = [
-  '#1976D2', '#e74c3c', '#27ae60', '#f1c40f', '#8e44ad', '#fff', '#000',
-  '#FF9800', '#00BCD4', '#9C27B0', '#F44336', '#4CAF50', '#FFC107', '#3F51B5',
-  '#E91E63', '#009688', '#CDDC39', '#FFEB3B', '#795548', '#607D8B', '#BDBDBD',
-];
+// Color Spectrum Picker Component
+const ColorSpectrumPicker = ({ 
+  visible, 
+  onClose, 
+  onColorSelect, 
+  initialColor = '#1976D2' 
+}: {
+  visible: boolean;
+  onClose: () => void;
+  onColorSelect: (color: string) => void;
+  initialColor?: string;
+}) => {
+  const [hue, setHue] = useState(210); // Start with blue
+  const [saturation, setSaturation] = useState(100);
+  const [brightness, setBrightness] = useState(100);
+
+  // Convert HSV to Hex
+  const hsvToHex = React.useCallback((h: number, s: number, v: number): string => {
+    const c = (v / 100) * (s / 100);
+    const x = c * (1 - Math.abs((h / 60) % 2 - 1));
+    const m = (v / 100) - c;
+
+    let r = 0, g = 0, b = 0;
+
+    if (h >= 0 && h < 60) {
+      r = c; g = x; b = 0;
+    } else if (h >= 60 && h < 120) {
+      r = x; g = c; b = 0;
+    } else if (h >= 120 && h < 180) {
+      r = 0; g = c; b = x;
+    } else if (h >= 180 && h < 240) {
+      r = 0; g = x; b = c;
+    } else if (h >= 240 && h < 300) {
+      r = x; g = 0; b = c;
+    } else {
+      r = c; g = 0; b = x;
+    }
+
+    const rHex = Math.round((r + m) * 255).toString(16).padStart(2, '0');
+    const gHex = Math.round((g + m) * 255).toString(16).padStart(2, '0');
+    const bHex = Math.round((b + m) * 255).toString(16).padStart(2, '0');
+
+    return `#${rHex}${gHex}${bHex}`;
+  }, []);
+
+  // Calculate current color without state updates
+  const selectedColor = React.useMemo(() => {
+    return hsvToHex(hue, saturation, brightness);
+  }, [hue, saturation, brightness, hsvToHex]);
+
+  const handleApply = () => {
+    onColorSelect(selectedColor);
+    onClose();
+  };
+
+  if (!visible) return null;
+
+  return (
+    <Modal
+      visible={visible}
+      transparent={true}
+      animationType="fade"
+      onRequestClose={onClose}
+    >
+      <View style={styles.colorPickerOverlay}>
+        <View style={styles.colorPickerContainer}>
+          <View style={styles.colorPickerHeader}>
+            <Text style={styles.colorPickerTitle}>Color Picker</Text>
+            <TouchableOpacity onPress={onClose} style={styles.closeButton}>
+              <Ionicons name="close" size={24} color="#666" />
+            </TouchableOpacity>
+          </View>
+
+          {/* Current Color Preview */}
+          <View style={styles.colorPreviewContainer}>
+            <View style={[styles.colorPreview, { backgroundColor: selectedColor }]} />
+            <Text style={styles.colorHex}>{selectedColor}</Text>
+          </View>
+
+          {/* Hue Slider */}
+          <View style={styles.sliderContainer}>
+            <Text style={styles.sliderLabel}>Hue</Text>
+            <View style={styles.hueSliderContainer}>
+              <View style={styles.hueSlider} />
+              <Slider
+                style={styles.slider}
+                minimumValue={0}
+                maximumValue={360}
+                value={hue}
+                onValueChange={(value) => {
+                  // Throttle updates to prevent excessive re-renders
+                  requestAnimationFrame(() => setHue(value));
+                }}
+                minimumTrackTintColor="transparent"
+                maximumTrackTintColor="transparent"
+              />
+            </View>
+          </View>
+
+          {/* Saturation Slider */}
+          <View style={styles.sliderContainer}>
+            <Text style={styles.sliderLabel}>Saturation</Text>
+            <Slider
+              style={styles.slider}
+              minimumValue={0}
+              maximumValue={100}
+              value={saturation}
+              onValueChange={(value) => {
+                // Throttle updates to prevent excessive re-renders
+                requestAnimationFrame(() => setSaturation(value));
+              }}
+              minimumTrackTintColor="#ddd"
+              maximumTrackTintColor="#ddd"
+            />
+          </View>
+
+          {/* Brightness Slider */}
+          <View style={styles.sliderContainer}>
+            <Text style={styles.sliderLabel}>Brightness</Text>
+            <Slider
+              style={styles.slider}
+              minimumValue={0}
+              maximumValue={100}
+              value={brightness}
+              onValueChange={(value) => {
+                // Throttle updates to prevent excessive re-renders
+                requestAnimationFrame(() => setBrightness(value));
+              }}
+              minimumTrackTintColor="#ddd"
+              maximumTrackTintColor="#ddd"
+            />
+          </View>
+
+          {/* Action Buttons */}
+          <View style={styles.colorPickerActions}>
+            <TouchableOpacity style={styles.cancelButton} onPress={onClose}>
+              <Text style={styles.cancelButtonText}>Cancel</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.applyButton} onPress={handleApply}>
+              <Text style={styles.applyButtonText}>Apply</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
+    </Modal>
+  );
+};
 
 const FONT_FAMILIES: string[] = ['System', 'Arial', 'Helvetica', 'Times New Roman', 'Georgia'];
 
@@ -50,20 +192,18 @@ const SHAPE_OPTIONS = [
 const MIN_SHAPE_SIZE = 30;
 
 function getHandlePositions(shape: any) {
-  const { size } = shape;
-  
-  // Different dimensions for different shape types
   let w, h;
+  
   if (shape.type === 'rectangle') {
-    w = size;
-    h = size * 0.7;
+    w = shape.width ?? shape.size;
+    h = shape.height ?? (shape.size * 0.7);
   } else if (shape.type === 'line') {
-    w = size;
-    h = 20; // Fixed height for line
+    w = shape.size;
+    h = 20;
   } else {
-    // For circle, triangle, and icon shapes
-    w = size;
-    h = size;
+    // For circle, triangle, and other shapes
+    w = shape.size;
+    h = shape.size;
   }
   
   return {
@@ -88,13 +228,18 @@ interface ResizeHandleProps {
 
 const ResizeHandle = ({ x, y, onResize, style, type }: ResizeHandleProps) => {
   const pan = React.useRef(new Animated.ValueXY({ x: 0, y: 0 })).current;
+  const lastUpdate = React.useRef(0);
+  
   const panResponder = React.useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: () => true,
       onPanResponderMove: (e, gesture) => {
-        // Debug log
-        console.log('ResizeHandle move', type, gesture.dx, gesture.dy);
+        // Throttle updates to prevent excessive re-renders
+        const now = Date.now();
+        if (now - lastUpdate.current > 16) { // ~60fps
         onResize(gesture.dx, gesture.dy);
+          lastUpdate.current = now;
+        }
       },
       onPanResponderRelease: () => {
         pan.setValue({ x: 0, y: 0 });
@@ -102,8 +247,8 @@ const ResizeHandle = ({ x, y, onResize, style, type }: ResizeHandleProps) => {
     })
   ).current;
   
-  const handleSize = type === 'corner' ? 20 : 16;
-  const handleRadius = type === 'corner' ? 10 : 4;
+  const handleSize = type === 'corner' ? 24 : 20;
+  const handleRadius = type === 'corner' ? 12 : 6;
   const offset = handleSize / 2;
   
   return (
@@ -118,13 +263,13 @@ const ResizeHandle = ({ x, y, onResize, style, type }: ResizeHandleProps) => {
           height: handleSize,
           borderRadius: handleRadius,
           backgroundColor: '#fff',
-          borderWidth: 2,
+          borderWidth: 3,
           borderColor: type === 'corner' ? '#3478f6' : '#666',
           shadowColor: '#000',
-          shadowOffset: { width: 0, height: 1 },
-          shadowOpacity: 0.15,
-          shadowRadius: 2,
-          elevation: 2,
+          shadowOffset: { width: 0, height: 2 },
+          shadowOpacity: 0.3,
+          shadowRadius: 4,
+          elevation: 4,
           zIndex: 10,
         },
         style,
@@ -344,6 +489,182 @@ const TextOnCanvas = ({ textObj, selected, onPress, draggable, updatePosition, c
   );
 };
 
+const NoteOnCanvas = ({ note, selected, onPress, draggable, updatePosition }: {
+  note: any;
+  selected?: boolean;
+  onPress?: (e?: GestureResponderEvent) => void;
+  draggable?: boolean;
+  updatePosition?: (x: number, y: number) => void;
+}) => {
+  const pan = React.useRef(new Animated.ValueXY({ x: note.x, y: note.y })).current;
+  const panOffset = React.useRef({ x: note.x, y: note.y });
+
+  React.useEffect(() => {
+    pan.setValue({ x: note.x, y: note.y });
+    panOffset.current = { x: note.x, y: note.y };
+  }, [note.x, note.y]);
+
+  const panResponder = React.useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onPanResponderGrant: () => {
+        if (onPress) onPress();
+        panOffset.current = { x: note.x, y: note.y };
+      },
+      onPanResponderMove: (e, gesture) => {
+        if (!draggable) return;
+        const newX = gesture.dx + panOffset.current.x;
+        const newY = gesture.dy + panOffset.current.y;
+        pan.setValue({ x: newX, y: newY });
+      },
+      onPanResponderRelease: () => {
+        const { x, y } = panOffset.current;
+        if (updatePosition) updatePosition(x, y);
+      },
+    })
+  ).current;
+
+  return (
+    <Animated.View
+      style={[
+        {
+          position: 'absolute',
+          left: pan.x,
+          top: pan.y,
+          width: note.width,
+          height: note.height,
+          backgroundColor: note.backgroundColor,
+          borderWidth: 2,
+          borderColor: selected ? '#6366F1' : note.borderColor,
+          borderRadius: 8,
+          padding: 8,
+          shadowColor: '#000',
+          shadowOffset: { width: 0, height: 2 },
+          shadowOpacity: 0.1,
+          shadowRadius: 4,
+          elevation: 3,
+        },
+      ]}
+      {...panResponder.panHandlers}
+    >
+      <Text style={{ fontSize: 14, color: '#23235B', lineHeight: 18 }}>
+        {note.text}
+      </Text>
+    </Animated.View>
+  );
+};
+
+const TableOnCanvas = ({ table, selected, onPress, draggable, updatePosition }: {
+  table: any;
+  selected?: boolean;
+  onPress?: (e?: GestureResponderEvent) => void;
+  draggable?: boolean;
+  updatePosition?: (x: number, y: number) => void;
+}) => {
+  const pan = React.useRef(new Animated.ValueXY({ x: table.x, y: table.y })).current;
+  const panOffset = React.useRef({ x: table.x, y: table.y });
+
+  React.useEffect(() => {
+    pan.setValue({ x: table.x, y: table.y });
+    panOffset.current = { x: table.x, y: table.y };
+  }, [table.x, table.y]);
+
+  const panResponder = React.useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onPanResponderGrant: () => {
+        if (onPress) onPress();
+        panOffset.current = { x: table.x, y: table.y };
+      },
+      onPanResponderMove: (e, gesture) => {
+        if (!draggable) return;
+        const newX = gesture.dx + panOffset.current.x;
+        const newY = gesture.dy + panOffset.current.y;
+        pan.setValue({ x: newX, y: newY });
+      },
+      onPanResponderRelease: () => {
+        const { x, y } = panOffset.current;
+        if (updatePosition) updatePosition(x, y);
+      },
+    })
+  ).current;
+
+  const renderTable = () => {
+    const cellWidth = table.width / table.columns;
+    const cellHeight = (table.height - 40) / table.rows; // 40 for title
+
+    return (
+      <View style={{ flex: 1 }}>
+        {/* Title */}
+        <View style={{
+          backgroundColor: table.titleBackgroundColor,
+          padding: 8,
+          borderTopLeftRadius: 8,
+          borderTopRightRadius: 8,
+          borderBottomWidth: 1,
+          borderBottomColor: table.borderColor,
+        }}>
+          <Text style={{ fontSize: 16, fontWeight: 'bold', color: '#fff', textAlign: 'center' }}>
+            {table.title}
+          </Text>
+        </View>
+        
+        {/* Table Body */}
+        <View style={{ flex: 1 }}>
+          {Array.from({ length: table.rows }).map((_, rowIndex) => (
+            <View key={rowIndex} style={{ flexDirection: 'row', flex: 1 }}>
+              {Array.from({ length: table.columns }).map((_, colIndex) => (
+                <View
+                  key={colIndex}
+                  style={{
+                    width: cellWidth,
+                    height: cellHeight,
+                    borderWidth: 1,
+                    borderColor: table.borderColor,
+                    backgroundColor: '#ffffff',
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                  }}
+                >
+                  <Text style={{ fontSize: 12, color: '#23235B' }}>
+                    Cell {rowIndex + 1},{colIndex + 1}
+                  </Text>
+                </View>
+              ))}
+            </View>
+          ))}
+        </View>
+      </View>
+    );
+  };
+
+  return (
+    <Animated.View
+      style={[
+        {
+          position: 'absolute',
+          left: pan.x,
+          top: pan.y,
+          width: table.width,
+          height: table.height,
+          backgroundColor: table.backgroundColor,
+          borderWidth: 2,
+          borderColor: selected ? '#6366F1' : table.borderColor,
+          borderRadius: 8,
+          shadowColor: '#000',
+          shadowOffset: { width: 0, height: 2 },
+          shadowOpacity: 0.1,
+          shadowRadius: 4,
+          elevation: 3,
+        },
+      ]}
+      {...panResponder.panHandlers}
+    >
+      {renderTable()}
+    </Animated.View>
+  );
+};
+
 type CanvaDesignPageProps = {
   hideHeader?: boolean;
   hideToolbar?: boolean;
@@ -387,35 +708,54 @@ export default function CanvaDesignPage({ hideHeader, hideToolbar }: CanvaDesign
   const [showCanvasColorPicker, setShowCanvasColorPicker] = useState(false);
   const [canvasNote, setCanvasNote] = useState('');
   const [showNoteModal, setShowNoteModal] = useState(false);
+  const [showColorPicker, setShowColorPicker] = useState(false);
+  const [currentColorPickerTarget, setCurrentColorPickerTarget] = useState<'shape' | 'text' | 'canvas' | 'draw'>('shape');
+  const [canvasNotes, setCanvasNotes] = useState<any[]>([]);
+  const [showTableModal, setShowTableModal] = useState(false);
+  const [canvasTables, setCanvasTables] = useState<any[]>([]);
+  const [tableTitle, setTableTitle] = useState('');
+  const [tableColumns, setTableColumns] = useState(3);
+  const [tableRows, setTableRows] = useState(3);
   const [canvasAnim] = useState(new Animated.Value(1));
 
   const designRef = useRef(null);
+  const prevStateRef = useRef<any>(null);
 
   // Save state to undo stack only when state changes
   React.useEffect(() => {
-    setUndoStack((prev) => {
-      const last = prev[0];
-      if (
-        last &&
-        JSON.stringify(last.canvasShapes) === JSON.stringify(canvasShapes) &&
-        JSON.stringify(last.canvasImages) === JSON.stringify(canvasImages) &&
-        JSON.stringify(last.drawPaths) === JSON.stringify(drawPaths) &&
-        JSON.stringify(last.canvasTexts) === JSON.stringify(canvasTexts)
-      ) {
-        return prev;
-      }
-      return [
-        {
+    const currentState = {
           canvasShapes,
           canvasImages,
           drawPaths,
           canvasTexts,
-        },
+          canvasNotes,
+          canvasTables,
+    };
+    
+    // Skip if this is the first render
+    if (prevStateRef.current === null) {
+      prevStateRef.current = currentState;
+      return;
+    }
+    
+    // Check if state actually changed
+    const prevState = prevStateRef.current;
+    const hasChanges = 
+      JSON.stringify(prevState.canvasShapes) !== JSON.stringify(canvasShapes) ||
+      JSON.stringify(prevState.canvasImages) !== JSON.stringify(canvasImages) ||
+      JSON.stringify(prevState.drawPaths) !== JSON.stringify(drawPaths) ||
+      JSON.stringify(prevState.canvasTexts) !== JSON.stringify(canvasTexts) ||
+      JSON.stringify(prevState.canvasNotes) !== JSON.stringify(canvasNotes) ||
+      JSON.stringify(prevState.canvasTables) !== JSON.stringify(canvasTables);
+    
+    if (hasChanges) {
+      setUndoStack((prev) => [
+        currentState,
         ...prev.slice(0, 19), // keep up to 20 undos
-      ];
-    });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [canvasShapes, canvasImages, drawPaths, canvasTexts]);
+      ]);
+      prevStateRef.current = currentState;
+    }
+  }, [canvasShapes, canvasImages, drawPaths, canvasTexts, canvasNotes, canvasTables]);
   // Undo handler
   const handleUndo = () => {
     if (undoStack.length > 1) {
@@ -424,6 +764,8 @@ export default function CanvaDesignPage({ hideHeader, hideToolbar }: CanvaDesign
       setCanvasImages(prev.canvasImages);
       setDrawPaths(prev.drawPaths);
       setCanvasTexts(prev.canvasTexts);
+      setCanvasNotes(prev.canvasNotes);
+      setCanvasTables(prev.canvasTables);
       setUndoStack(undoStack.slice(1));
     }
   };
@@ -437,6 +779,8 @@ export default function CanvaDesignPage({ hideHeader, hideToolbar }: CanvaDesign
       setCanvasImages([]);
       setDrawPaths([]);
       setCanvasTexts([]);
+      setCanvasNotes([]);
+      setCanvasTables([]);
       setSelectedShapeId(null);
       setCanvasBgColor('#fff');
       setUndoStack([]);
@@ -454,6 +798,8 @@ export default function CanvaDesignPage({ hideHeader, hideToolbar }: CanvaDesign
         setCanvasImages(designData.canvasImages || []);
         setDrawPaths(designData.drawPaths || []);
         setCanvasTexts(designData.canvasTexts || []);
+        setCanvasNotes(designData.canvasNotes || []);
+        setCanvasTables(designData.canvasTables || []);
         setCanvasBgColor(canvasBgColorParam || '#fff');
         setSelectedShapeId(null);
         setUndoStack([]);
@@ -531,6 +877,14 @@ export default function CanvaDesignPage({ hideHeader, hideToolbar }: CanvaDesign
     } else if (tool === 'Shapes') {
       setShapePickerOpen(true);
       setDrawToolActive(false);
+    } else if (tool === 'Notes') {
+      setShowNoteModal(true);
+      setDrawToolActive(false);
+      setShapePickerOpen(false);
+    } else if (tool === 'Table') {
+      setShowTableModal(true);
+      setDrawToolActive(false);
+      setShapePickerOpen(false);
     } else {
       setDrawToolActive(false);
       setShapePickerOpen(false);
@@ -538,18 +892,36 @@ export default function CanvaDesignPage({ hideHeader, hideToolbar }: CanvaDesign
   };
 
   const handleShapeSelect = (shapeType: string) => {
-    const newShape = {
-      id: Date.now(),
+    const newId = Date.now();
+    if (shapeType === 'rectangle') {
+      setCanvasShapes((prev) => [
+        ...prev,
+        {
+          id: newId,
+          type: 'rectangle',
+          x: 40 + Math.random() * 60,
+          y: 40 + Math.random() * 60,
+          width: 60,
+          height: 42, // 60 * 0.7
+          color: '#1976D2',
+        },
+      ]);
+    } else {
+      setCanvasShapes((prev) => [
+        ...prev,
+        {
+          id: newId,
       type: shapeType,
       x: 40 + Math.random() * 60,
       y: 40 + Math.random() * 60,
       size: 60,
       color: '#1976D2',
-    };
-    setCanvasShapes((prev) => [...prev, newShape]);
+        },
+      ]);
+    }
     setShapePickerOpen(false);
     setActiveTool(null);
-    setSelectedShapeId(newShape.id);
+    setSelectedShapeId(newId);
   };
 
   const handleCanvasPress = (e: any) => {
@@ -578,13 +950,16 @@ export default function CanvaDesignPage({ hideHeader, hideToolbar }: CanvaDesign
     );
   };
 
-  const updateShapeSize = (id: number, newSize: number, newX: number, newY: number) => {
-    // Debug log
-    console.log('updateShapeSize', { id, newSize, newX, newY });
+  const updateShapeSize = (id: number, newW: number, newH: number, newX: number, newY: number) => {
     setCanvasShapes((prev) =>
-      prev.map((shape) =>
-        shape.id === id ? { ...shape, size: newSize, x: newX, y: newY } : shape
-      )
+      prev.map((shape) => {
+        if (shape.id !== id) return shape;
+        if (shape.type === 'rectangle') {
+          return { ...shape, width: newW, height: newH, x: newX, y: newY };
+        } else {
+          return { ...shape, size: newW, x: newX, y: newY };
+        }
+      })
     );
   };
 
@@ -608,6 +983,115 @@ export default function CanvaDesignPage({ hideHeader, hideToolbar }: CanvaDesign
   const deleteSelectedText = () => {
     setCanvasTexts((prev) => prev.filter((txt) => txt.id !== selectedShapeId));
     setSelectedShapeId(null);
+  };
+
+  // Layer ordering functions
+  const bringToFront = () => {
+    if (!selectedShapeId) return;
+    
+    // Handle shapes
+    const selectedShape = canvasShapes.find(shape => shape.id === selectedShapeId);
+    if (selectedShape) {
+      setCanvasShapes(prev => {
+        const filtered = prev.filter(shape => shape.id !== selectedShapeId);
+        return [...filtered, selectedShape];
+      });
+      return;
+    }
+    
+    // Handle images
+    const selectedImage = canvasImages.find(img => img.id === selectedShapeId);
+    if (selectedImage) {
+      setCanvasImages(prev => {
+        const filtered = prev.filter(img => img.id !== selectedShapeId);
+        return [...filtered, selectedImage];
+      });
+      return;
+    }
+    
+    // Handle texts
+    const selectedText = canvasTexts.find(txt => txt.id === selectedShapeId);
+    if (selectedText) {
+      setCanvasTexts(prev => {
+        const filtered = prev.filter(txt => txt.id !== selectedShapeId);
+        return [...filtered, selectedText];
+      });
+      return;
+    }
+    
+    // Handle notes
+    const selectedNote = canvasNotes.find(note => note.id === selectedShapeId);
+    if (selectedNote) {
+      setCanvasNotes(prev => {
+        const filtered = prev.filter(note => note.id !== selectedShapeId);
+        return [...filtered, selectedNote];
+      });
+      return;
+    }
+    
+    // Handle tables
+    const selectedTable = canvasTables.find(table => table.id === selectedShapeId);
+    if (selectedTable) {
+      setCanvasTables(prev => {
+        const filtered = prev.filter(table => table.id !== selectedShapeId);
+        return [...filtered, selectedTable];
+      });
+      return;
+    }
+  };
+
+  const sendToBack = () => {
+    if (!selectedShapeId) return;
+    
+    // Handle shapes
+    const selectedShape = canvasShapes.find(shape => shape.id === selectedShapeId);
+    if (selectedShape) {
+      setCanvasShapes(prev => {
+        const filtered = prev.filter(shape => shape.id !== selectedShapeId);
+        return [selectedShape, ...filtered];
+      });
+      return;
+    }
+    
+    // Handle images
+    const selectedImage = canvasImages.find(img => img.id === selectedShapeId);
+    if (selectedImage) {
+      setCanvasImages(prev => {
+        const filtered = prev.filter(img => img.id !== selectedShapeId);
+        return [selectedImage, ...filtered];
+      });
+      return;
+    }
+    
+    // Handle texts
+    const selectedText = canvasTexts.find(txt => txt.id === selectedShapeId);
+    if (selectedText) {
+      setCanvasTexts(prev => {
+        const filtered = prev.filter(txt => txt.id !== selectedShapeId);
+        return [selectedText, ...filtered];
+      });
+      return;
+    }
+    
+    // Handle notes
+    const selectedNote = canvasNotes.find(note => note.id === selectedShapeId);
+    if (selectedNote) {
+      setCanvasNotes(prev => {
+        const filtered = prev.filter(note => note.id !== selectedShapeId);
+        return [selectedNote, ...filtered];
+      });
+      return;
+    }
+    
+    // Handle tables
+    const selectedTable = canvasTables.find(table => table.id === selectedShapeId);
+    if (selectedTable) {
+      setCanvasTables(prev => {
+        const filtered = prev.filter(table => table.id !== selectedShapeId);
+        return [selectedTable, ...filtered];
+      });
+      return;
+    }
   };
 
   // Change background color (placeholder)
@@ -643,13 +1127,21 @@ export default function CanvaDesignPage({ hideHeader, hideToolbar }: CanvaDesign
       )
     );
   };
-  const updateImageSize = (id: number, newWidth: number, newHeight: number, newX: number, newY: number) => {
-    setCanvasImages((prev) =>
-      prev.map((img) =>
+  const updateImageSize = React.useCallback((id: number, newWidth: number, newHeight: number, newX: number, newY: number) => {
+    setCanvasImages((prev) => {
+      const image = prev.find(img => img.id === id);
+      if (!image) return prev;
+      
+      // Only update if there are actual changes
+      if (image.width === newWidth && image.height === newHeight && image.x === newX && image.y === newY) {
+        return prev;
+      }
+      
+      return prev.map((img) =>
         img.id === id ? { ...img, width: newWidth, height: newHeight, x: newX, y: newY } : img
-      )
     );
-  };
+    });
+  }, []);
 
   // Add deleteSelectedImage function
   const deleteSelectedImage = () => {
@@ -663,27 +1155,38 @@ export default function CanvaDesignPage({ hideHeader, hideToolbar }: CanvaDesign
       setToolbarPos(null);
       return;
     }
+    
+    // Use a more efficient approach to avoid infinite loops
+    const calculateToolbarPos = () => {
     const shape = canvasShapes.find((s) => s.id === selectedShapeId);
     if (shape) {
       const w = shape.type === 'rectangle' ? shape.size : shape.size;
       const h = shape.type === 'rectangle' ? shape.size * 0.7 : shape.size;
-      setToolbarPos({ x: shape.x + w / 2, y: Math.max(shape.y - 32, 0) });
-      return;
+        return { x: shape.x + w / 2, y: Math.max(shape.y - 32, 0) };
     }
+      
     const image = canvasImages.find((img) => img.id === selectedShapeId);
     if (image) {
-      setToolbarPos({ x: image.x + image.width / 2, y: Math.max(image.y - 32, 0) });
-      return;
+        return { x: image.x + image.width / 2, y: Math.max(image.y - 32, 0) };
     }
+      
     const text = canvasTexts.find((txt) => txt.id === selectedShapeId);
     if (text) {
-      // Estimate text width: fontSize * 0.6 * text.length
-      const width = (text.fontSize || 16) * 0.6 * (text.text?.length || 1);
-      setToolbarPos({ x: text.x + width / 2, y: Math.max(text.y - 32, 0) });
-      return;
-    }
-    setToolbarPos(null);
-  }, [selectedShapeId, canvasShapes, canvasImages, canvasTexts]);
+        // Better text width calculation that accounts for line breaks and actual rendering
+        const fontSize = text.fontSize || 16;
+        const textLines = text.text?.split('\n') || [''];
+        const maxLineLength = Math.max(...textLines.map((line: string) => line.length));
+        const estimatedWidth = Math.min(fontSize * 0.6 * maxLineLength, 300); // Cap at 300px
+        return { x: text.x + estimatedWidth / 2, y: Math.max(text.y - 32, 0) };
+      }
+      
+      return null;
+    };
+    
+    const newPos = calculateToolbarPos();
+    console.log('Toolbar position calculated:', newPos, 'for selectedShapeId:', selectedShapeId);
+    setToolbarPos(newPos);
+  }, [selectedShapeId]); // Only depend on selectedShapeId, not the arrays
 
   // Drawing logic on canvas
   const getDrawColor = () => {
@@ -728,18 +1231,35 @@ export default function CanvaDesignPage({ hideHeader, hideToolbar }: CanvaDesign
     setCanvasShapes([]);
     setCanvasImages([]);
     setDrawPaths([]);
-    setCanvasTexts([]); // Clear all text elements
+    setCanvasTexts([]);
+    setCanvasNotes([]);
+    setCanvasTables([]);
     setSelectedShapeId(null);
+    setCanvasFocused(true);
   };
 
   // 5. Text element selection logic
   const handleTextPress = (id: number, e?: GestureResponderEvent) => {
     if (e && e.stopPropagation) e.stopPropagation();
+    console.log('Text pressed:', id);
     setSelectedShapeId(id); // Always set selection
     setCanvasFocused(false);
   };
+
+  const handleNotePress = (id: number, e?: GestureResponderEvent) => {
+    if (e && e.stopPropagation) e.stopPropagation();
+    setSelectedShapeId(id);
+    setCanvasFocused(false);
+  };
+
+  const handleTablePress = (id: number, e?: GestureResponderEvent) => {
+    if (e && e.stopPropagation) e.stopPropagation();
+    setSelectedShapeId(id);
+    setCanvasFocused(false);
+  };
+
   const updateTextPosition = (id: number, newX: number, newY: number) => {
-    setCanvasTexts((prev) => prev.map((txt) => txt.id === id ? { ...txt, x: newX, y: newY } : txt));
+    setCanvasTexts(prev => prev.map(txt => txt.id === id ? { ...txt, x: newX, y: newY } : txt));
   };
 
   const handleCanvasColor = () => setShowCanvasColorPicker(true);
@@ -751,6 +1271,50 @@ export default function CanvaDesignPage({ hideHeader, hideToolbar }: CanvaDesign
     ]).start();
   };
   const handleCanvasNote = () => setShowNoteModal(true);
+
+  const updateNotePosition = (id: number, newX: number, newY: number) => {
+    setCanvasNotes(prev => prev.map(note => note.id === id ? { ...note, x: newX, y: newY } : note));
+  };
+
+  const updateTablePosition = (id: number, newX: number, newY: number) => {
+    setCanvasTables(prev => prev.map(table => table.id === id ? { ...table, x: newX, y: newY } : table));
+  };
+
+  const handleAddNote = (noteText: string) => {
+    const newNote = {
+      id: Date.now(),
+      text: noteText,
+      x: 50 + Math.random() * 100,
+      y: 50 + Math.random() * 100,
+      width: 200,
+      height: 100,
+      backgroundColor: '#fff3cd',
+      borderColor: '#ffeaa7',
+    };
+    setCanvasNotes(prev => [...prev, newNote]);
+    setShowNoteModal(false);
+    setCanvasNote('');
+    setActiveTool(null);
+  };
+
+  const handleAddTable = (tableData: { title: string; columns: number; rows: number }) => {
+    const newTable = {
+      id: Date.now(),
+      title: tableData.title,
+      columns: tableData.columns,
+      rows: tableData.rows,
+      x: 50 + Math.random() * 100,
+      y: 50 + Math.random() * 100,
+      width: 300,
+      height: 200,
+      backgroundColor: '#ffffff',
+      borderColor: '#000000',
+      titleBackgroundColor: '#4CAF50',
+    };
+    setCanvasTables(prev => [...prev, newTable]);
+    setShowTableModal(false);
+    setActiveTool(null);
+  };
 
   const handleExport = async () => {
     try {
@@ -950,12 +1514,18 @@ export default function CanvaDesignPage({ hideHeader, hideToolbar }: CanvaDesign
             />
           ))}
             {/* Text editing toolbar - appears when text is selected */}
-            {selectedShapeId && canvasTexts.find(txt => txt.id === selectedShapeId) && (
-              <View style={[styles.textToolbar, { left: (toolbarPos?.x ?? 0) - 60, top: (toolbarPos?.y ?? 0) - 48 }]}>
-                    <TouchableOpacity style={styles.toolbarBtn} onPress={deleteSelectedShape}>
+            {selectedShapeId && canvasTexts.find(txt => txt.id === selectedShapeId) && toolbarPos && (
+              <View style={[styles.textToolbar, { 
+                left: Math.max(10, Math.min(toolbarPos.x - 60, screenWidth - 120)), 
+                top: Math.max(10, toolbarPos.y - 48) 
+              }]}>
+                    <TouchableOpacity style={styles.toolbarBtn} onPress={deleteSelectedText}>
                       <Ionicons name="trash-outline" size={22} color="#e74c3c" />
                     </TouchableOpacity>
-                    <TouchableOpacity style={styles.toolbarBtn} onPress={() => setColorPickerOpen(true)}>
+                    <TouchableOpacity style={styles.toolbarBtn} onPress={() => {
+                      setCurrentColorPickerTarget('text');
+                      setShowColorPicker(true);
+                    }}>
                       <Ionicons name="color-palette-outline" size={22} color="#3478f6" />
                     </TouchableOpacity>
                 <TouchableOpacity style={styles.toolbarBtn} onPress={() => {
@@ -971,6 +1541,12 @@ export default function CanvaDesignPage({ hideHeader, hideToolbar }: CanvaDesign
                 }}>
                   <Ionicons name="create-outline" size={22} color="#27ae60" />
                 </TouchableOpacity>
+                <TouchableOpacity style={styles.toolbarBtn} onPress={bringToFront}>
+                  <Ionicons name="arrow-up" size={22} color="#f39c12" />
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.toolbarBtn} onPress={sendToBack}>
+                  <Ionicons name="arrow-down" size={22} color="#f39c12" />
+                </TouchableOpacity>
                   </View>
             )}
             {/* Image editing toolbar - appears when image is selected */}
@@ -978,6 +1554,12 @@ export default function CanvaDesignPage({ hideHeader, hideToolbar }: CanvaDesign
               <View style={[styles.imageToolbar, { left: (toolbarPos?.x ?? 0) - 40, top: (toolbarPos?.y ?? 0) - 48 }]}>
                     <TouchableOpacity style={styles.toolbarBtn} onPress={deleteSelectedImage}>
                       <Ionicons name="trash-outline" size={22} color="#e74c3c" />
+                    </TouchableOpacity>
+                <TouchableOpacity style={styles.toolbarBtn} onPress={bringToFront}>
+                  <Ionicons name="arrow-up" size={22} color="#f39c12" />
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.toolbarBtn} onPress={sendToBack}>
+                  <Ionicons name="arrow-down" size={22} color="#f39c12" />
                     </TouchableOpacity>
                   </View>
             )}
@@ -990,23 +1572,28 @@ export default function CanvaDesignPage({ hideHeader, hideToolbar }: CanvaDesign
                 <TouchableOpacity style={styles.toolbarBtn} onPress={() => setColorPickerOpen(true)}>
                   <Ionicons name="color-palette-outline" size={22} color="#3478f6" />
                     </TouchableOpacity>
+                <TouchableOpacity style={styles.toolbarBtn} onPress={bringToFront}>
+                  <Ionicons name="arrow-up" size={22} color="#f39c12" />
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.toolbarBtn} onPress={sendToBack}>
+                  <Ionicons name="arrow-down" size={22} color="#f39c12" />
+                    </TouchableOpacity>
                   </View>
           )}
             {/* REMOVED: Floating toolbar for selected shape or canvas */}
-          {/* Simple color picker (placeholder) */}
+          {/* Color picker button */}
           {colorPickerOpen && (
             <View style={styles.colorPickerPopup}>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.colorPickerScroll}>
-                {COLOR_PALETTE.map((color: string) => (
                   <TouchableOpacity
-                    key={color}
-                    style={[styles.colorSwatch, { backgroundColor: color },
-                      selectedShapeId && canvasShapes.find(s => s.id === selectedShapeId)?.color === color ? styles.selectedSwatch : null
-                    ]}
-                    onPress={() => changeShapeColor(color)}
-                  />
-                ))}
-              </ScrollView>
+                style={styles.colorPickerButton}
+                onPress={() => {
+                  setCurrentColorPickerTarget('shape');
+                  setShowColorPicker(true);
+                }}
+              >
+                <Ionicons name="color-palette" size={24} color="#3478f6" />
+                <Text style={styles.colorPickerButtonText}>Choose Color</Text>
+              </TouchableOpacity>
             </View>
           )}
           {/* Render drawn paths */}
@@ -1035,6 +1622,28 @@ export default function CanvaDesignPage({ hideHeader, hideToolbar }: CanvaDesign
               />
             )}
           </Svg>
+          {/* Render note elements on the canvas */}
+          {canvasNotes.map((note) => (
+            <NoteOnCanvas
+              key={note.id}
+              note={note}
+              selected={selectedShapeId === note.id}
+              onPress={(e) => handleNotePress(note.id, e)}
+              draggable={selectedShapeId === note.id}
+              updatePosition={(x, y) => updateNotePosition(note.id, x, y)}
+            />
+          ))}
+          {/* Render table elements on the canvas */}
+          {canvasTables.map((table) => (
+            <TableOnCanvas
+              key={table.id}
+              table={table}
+              selected={selectedShapeId === table.id}
+              onPress={(e) => handleTablePress(table.id, e)}
+              draggable={selectedShapeId === table.id}
+              updatePosition={(x, y) => updateTablePosition(table.id, x, y)}
+            />
+          ))}
         </View>
         </ViewShot>
       </View>
@@ -1079,18 +1688,20 @@ export default function CanvaDesignPage({ hideHeader, hideToolbar }: CanvaDesign
             <TouchableOpacity style={styles.thicknessSliderClose} onPress={() => { setDrawToolActive(false); setActiveTool(null); }}>
               <Ionicons name="close" size={24} color="#888" />
             </TouchableOpacity>
-            {/* Color picker popup for pencil */}
+            {/* Color picker button for pencil */}
             {drawColorPickerOpen && (
               <View style={[styles.colorPickerPopup, { top: -70, left: undefined, right: 0, transform: [] }]}> 
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.colorPickerScroll}>
-                  {COLOR_PALETTE.map((color: string) => (
                     <TouchableOpacity
-                      key={color}
-                      style={[styles.colorSwatch, { backgroundColor: color }, pencilColor === color ? styles.selectedSwatch : null]}
-                      onPress={() => { setPencilColor(color); setDrawColorPickerOpen(false); }}
-                    />
-                  ))}
-                </ScrollView>
+                  style={styles.colorPickerButton}
+                  onPress={() => {
+                    setCurrentColorPickerTarget('draw');
+                    setShowColorPicker(true);
+                    setDrawColorPickerOpen(false);
+                  }}
+                >
+                  <Ionicons name="color-palette" size={20} color="#3478f6" />
+                  <Text style={styles.colorPickerButtonText}>Choose Color</Text>
+                </TouchableOpacity>
               </View>
             )}
           </View>
@@ -1140,7 +1751,11 @@ export default function CanvaDesignPage({ hideHeader, hideToolbar }: CanvaDesign
             <TextInput
               value={textInputValue}
               onChangeText={setTextInputValue}
-              style={{ borderWidth: 1, borderColor: '#ccc', borderRadius: 8, padding: 8, marginBottom: 12, fontSize: textInputFontSize, color: textInputColor }}
+              style={{ borderWidth: 1, borderColor: '#ccc', borderRadius: 8, padding: 8, marginBottom: 12, fontSize: textInputFontSize, color: textInputColor, minHeight: 80, textAlignVertical: 'top' }}
+              multiline
+              returnKeyType="default"
+              blurOnSubmit={false}
+              placeholder="Enter text... (Press Enter for new line)"
             />
             <Text style={{ marginBottom: 4 }}>Font Size</Text>
             <TextInput
@@ -1171,23 +1786,23 @@ export default function CanvaDesignPage({ hideHeader, hideToolbar }: CanvaDesign
             </View>
             <Text style={{ marginBottom: 4 }}>Color</Text>
             <View style={{ flexDirection: 'row', marginBottom: 12 }}>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ flexDirection: 'row', alignItems: 'center' }}>
-                {COLOR_PALETTE.map((color) => (
                   <TouchableOpacity
-                    key={color}
                     style={{
-                      width: 28,
-                      height: 28,
-                      borderRadius: 14,
-                      marginHorizontal: 4,
-                      backgroundColor: color,
-                      borderWidth: textInputColor === color ? 3 : 2,
-                      borderColor: textInputColor === color ? '#3478f6' : '#eee',
-                    }}
-                    onPress={() => setTextInputColor(color)}
-                  />
-                ))}
-              </ScrollView>
+                  paddingHorizontal: 12,
+                  paddingVertical: 8,
+                  backgroundColor: '#3478f6',
+                  borderRadius: 8,
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                }}
+                onPress={() => {
+                  setCurrentColorPickerTarget('text');
+                  setShowColorPicker(true);
+                }}
+              >
+                <Ionicons name="color-palette" size={16} color="#fff" />
+                <Text style={{ color: '#fff', marginLeft: 4, fontWeight: '600' }}>Choose Color</Text>
+              </TouchableOpacity>
             </View>
             <TextInput
               value={textInputColor}
@@ -1210,26 +1825,25 @@ export default function CanvaDesignPage({ hideHeader, hideToolbar }: CanvaDesign
         <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.2)' }}>
           <View style={{ backgroundColor: '#fff', borderRadius: 16, padding: 20, minWidth: 220 }}>
             <Text style={{ fontWeight: 'bold', fontSize: 16, marginBottom: 8 }}>Text Color</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ flexDirection: 'row', alignItems: 'center' }}>
-              {COLOR_PALETTE.map((color: string) => (
                 <TouchableOpacity
-                  key={color}
                   style={{
-                    width: 28,
-                    height: 28,
-                    borderRadius: 14,
-                    marginHorizontal: 4,
-                    backgroundColor: color,
-                    borderWidth: selectedText && selectedText.color === color ? 3 : 2,
-                    borderColor: selectedText && selectedText.color === color ? '#3478f6' : '#eee',
+                paddingHorizontal: 12,
+                paddingVertical: 8,
+                backgroundColor: '#3478f6',
+                borderRadius: 8,
+                flexDirection: 'row',
+                alignItems: 'center',
+                alignSelf: 'center',
                   }}
                   onPress={() => {
-                    setCanvasTexts((prev) => prev.map((txt) => txt.id === selectedText.id ? { ...txt, color } : txt));
+                setCurrentColorPickerTarget('text');
+                setShowColorPicker(true);
                     setShowTextColorPicker(false);
                   }}
-                />
-              ))}
-            </ScrollView>
+            >
+              <Ionicons name="color-palette" size={16} color="#fff" />
+              <Text style={{ color: '#fff', marginLeft: 4, fontWeight: '600' }}>Choose Color</Text>
+            </TouchableOpacity>
             <Button title="Close" onPress={() => setShowTextColorPicker(false)} />
           </View>
         </View>
@@ -1297,28 +1911,25 @@ export default function CanvaDesignPage({ hideHeader, hideToolbar }: CanvaDesign
         <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.2)' }}>
           <View style={{ backgroundColor: '#fff', borderRadius: 16, padding: 20, width: 320, maxWidth: '90%' }}>
             <Text style={{ fontWeight: 'bold', fontSize: 16, marginBottom: 8 }}>Canvas Background Color</Text>
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={true}
-              contentContainerStyle={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 8 }}
-              style={{ maxWidth: 300 }}
-            >
-              {COLOR_PALETTE.map((color: string) => (
                 <TouchableOpacity
-                  key={color}
                   style={{
-                    width: 32,
-                    height: 32,
-                    borderRadius: 16,
-                    marginHorizontal: 4,
-                    backgroundColor: color,
-                    borderWidth: canvasBgColor === color ? 3 : 2,
-                    borderColor: canvasBgColor === color ? '#3478f6' : '#eee',
-                  }}
-                  onPress={() => { setCanvasBgColor(color); setShowCanvasColorPicker(false); }}
-                />
-              ))}
-            </ScrollView>
+                paddingHorizontal: 12,
+                paddingVertical: 8,
+                backgroundColor: '#3478f6',
+                borderRadius: 8,
+                flexDirection: 'row',
+                alignItems: 'center',
+                alignSelf: 'center',
+              }}
+              onPress={() => {
+                setCurrentColorPickerTarget('canvas');
+                setShowColorPicker(true);
+                setShowCanvasColorPicker(false);
+              }}
+            >
+              <Ionicons name="color-palette" size={16} color="#fff" />
+              <Text style={{ color: '#fff', marginLeft: 4, fontWeight: '600' }}>Choose Color</Text>
+            </TouchableOpacity>
             <Button title="Close" onPress={() => setShowCanvasColorPicker(false)} />
           </View>
         </View>
@@ -1338,11 +1949,78 @@ export default function CanvaDesignPage({ hideHeader, hideToolbar }: CanvaDesign
             <View style={{ flexDirection: 'row', justifyContent: 'flex-end' }}>
               <Button title="Cancel" onPress={() => setShowNoteModal(false)} />
               <View style={{ width: 12 }} />
-              <Button title="Save" onPress={() => setShowNoteModal(false)} />
+              <Button title="Save" onPress={() => handleAddNote(canvasNote)} />
             </View>
           </View>
         </View>
       </Modal>
+      {/* Table modal */}
+      <Modal visible={showTableModal} transparent animationType="fade">
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.2)' }}>
+          <View style={{ backgroundColor: '#fff', borderRadius: 16, padding: 20, minWidth: 280 }}>
+            <Text style={{ fontWeight: 'bold', fontSize: 16, marginBottom: 16 }}>Create Table</Text>
+            
+            <Text style={{ fontSize: 14, marginBottom: 4 }}>Title</Text>
+            <TextInput
+              placeholder="Enter table title..."
+              style={{ borderWidth: 1, borderColor: '#ccc', borderRadius: 8, padding: 8, marginBottom: 12 }}
+              onChangeText={(text) => setTableTitle(text)}
+            />
+            
+            <Text style={{ fontSize: 14, marginBottom: 4 }}>Columns</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
+              <TouchableOpacity onPress={() => setTableColumns(Math.max(1, tableColumns - 1))}>
+                <Ionicons name="remove" size={24} color="#6366F1" />
+              </TouchableOpacity>
+              <Text style={{ marginHorizontal: 12, fontSize: 16, fontWeight: 'bold' }}>{tableColumns}</Text>
+              <TouchableOpacity onPress={() => setTableColumns(tableColumns + 1)}>
+                <Ionicons name="add" size={24} color="#6366F1" />
+              </TouchableOpacity>
+            </View>
+            
+            <Text style={{ fontSize: 14, marginBottom: 4 }}>Rows</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 16 }}>
+              <TouchableOpacity onPress={() => setTableRows(Math.max(1, tableRows - 1))}>
+                <Ionicons name="remove" size={24} color="#6366F1" />
+              </TouchableOpacity>
+              <Text style={{ marginHorizontal: 12, fontSize: 16, fontWeight: 'bold' }}>{tableRows}</Text>
+              <TouchableOpacity onPress={() => setTableRows(tableRows + 1)}>
+                <Ionicons name="add" size={24} color="#6366F1" />
+              </TouchableOpacity>
+            </View>
+            
+            <View style={{ flexDirection: 'row', justifyContent: 'flex-end' }}>
+              <Button title="Cancel" onPress={() => setShowTableModal(false)} />
+              <View style={{ width: 12 }} />
+              <Button title="Create" onPress={() => handleAddTable({ title: tableTitle, columns: tableColumns, rows: tableRows })} />
+            </View>
+          </View>
+        </View>
+      </Modal>
+      {/* Color Spectrum Picker */}
+      <ColorSpectrumPicker
+        visible={showColorPicker}
+        onClose={() => setShowColorPicker(false)}
+        onColorSelect={(color) => {
+          console.log('Color selected:', color, 'target:', currentColorPickerTarget, 'selectedShapeId:', selectedShapeId);
+          if (currentColorPickerTarget === 'shape') {
+            changeShapeColor(color);
+          } else if (currentColorPickerTarget === 'text') {
+            // Update the selected text color
+            const selectedText = canvasTexts.find(txt => txt.id === selectedShapeId);
+            console.log('Selected text for color update:', selectedText);
+            if (selectedText) {
+              setCanvasTexts((prev) => prev.map((txt) => txt.id === selectedText.id ? { ...txt, color } : txt));
+            }
+          } else if (currentColorPickerTarget === 'draw') {
+            setPencilColor(color);
+          } else if (currentColorPickerTarget === 'canvas') {
+            setCanvasBgColor(color);
+          }
+          setShowColorPicker(false);
+        }}
+        initialColor="#1976D2"
+      />
     </View>
   );
 }
@@ -1408,7 +2086,7 @@ const ShapeOnCanvas = ({ shape, selected, onPress, draggable, updatePosition, ca
   draggable?: boolean;
   updatePosition?: (x: number, y: number) => void;
   canvasLayout?: { x: number; y: number; width: number; height: number };
-  updateSize?: (id: number, newSize: number, newX: number, newY: number) => void;
+  updateSize?: (id: number, newW: number, newH: number, newX: number, newY: number) => void;
 }) => {
   // Debug log for selection
   console.log('ShapeOnCanvas', shape.id, 'selected:', selected);
@@ -1447,22 +2125,54 @@ const ShapeOnCanvas = ({ shape, selected, onPress, draggable, updatePosition, ca
       },
       onPanResponderMove: (e, gesture) => {
         if (!canvasLayout || !selected) return;
+        
+        // Get current shape dimensions
+        let shapeWidth, shapeHeight;
+        if (shape.type === 'rectangle') {
+          shapeWidth = shape.width ?? shape.size;
+          shapeHeight = shape.height ?? (shape.size * 0.7);
+        } else if (shape.type === 'line') {
+          shapeWidth = shape.size;
+          shapeHeight = 20;
+        } else {
+          shapeWidth = shape.size;
+          shapeHeight = shape.size;
+        }
+        
         let newX = gesture.dx + panOffset.current.x;
         let newY = gesture.dy + panOffset.current.y;
-        // Constrain within canvas
-        newX = Math.max(0, Math.min(newX, canvasLayout.width - (shape.size || 36)));
-        newY = Math.max(0, Math.min(newY, canvasLayout.height - (shape.size || 36)));
+        
+        // Constrain within canvas boundaries
+        newX = Math.max(0, Math.min(newX, canvasLayout.width - shapeWidth));
+        newY = Math.max(0, Math.min(newY, canvasLayout.height - shapeHeight));
+        
         pan.setValue({ x: newX, y: newY });
       },
       onPanResponderRelease: (e, gesture) => {
         if (!canvasLayout || !selected) return;
+        
+        // Get current shape dimensions
+        let shapeWidth, shapeHeight;
+        if (shape.type === 'rectangle') {
+          shapeWidth = shape.width ?? shape.size;
+          shapeHeight = shape.height ?? (shape.size * 0.7);
+        } else if (shape.type === 'line') {
+          shapeWidth = shape.size;
+          shapeHeight = 20;
+        } else {
+          shapeWidth = shape.size;
+          shapeHeight = shape.size;
+        }
+        
         // @ts-ignore
         const { x, y } = pan.__getValue();
         let newX = x;
         let newY = y;
-        // Constrain within canvas
-        newX = Math.max(0, Math.min(newX, canvasLayout.width - (shape.size || 36)));
-        newY = Math.max(0, Math.min(newY, canvasLayout.height - (shape.size || 36)));
+        
+        // Constrain within canvas boundaries
+        newX = Math.max(0, Math.min(newX, canvasLayout.width - shapeWidth));
+        newY = Math.max(0, Math.min(newY, canvasLayout.height - shapeHeight));
+        
         pan.setValue({ x: newX, y: newY });
         panOffset.current = { x: newX, y: newY };
         updatePosition && updatePosition(newX, newY);
@@ -1473,82 +2183,95 @@ const ShapeOnCanvas = ({ shape, selected, onPress, draggable, updatePosition, ca
   // Resize logic (for all shapes)
   const handleResize = (handle: string, dx: number, dy: number) => {
     if (!selected || !updateSize || !canvasLayout) return;
-    let { x, y, size } = shape;
     
     // Get current dimensions based on shape type
+    let { x, y, size, width, height } = shape;
     let w, h;
+    
     if (shape.type === 'rectangle') {
-      w = size;
-      h = size * 0.7;
+      w = width ?? size;
+      h = height ?? (size * 0.7);
     } else if (shape.type === 'line') {
       w = size;
       h = 20;
     } else {
-      // For circle, triangle, and icon shapes
+      // For circle, triangle, and other shapes
       w = size;
       h = size;
     }
     
     let newX = x, newY = y, newW = w, newH = h;
     
-    // Debug log
-    console.log('handleResize', handle, dx, dy, { x, y, w, h, shapeType: shape.type });
-    
-    // Handle logic for each handle
     switch (handle) {
       case 'topLeft':
+        // Corner: change both width and height, move position
         newX = x + dx;
         newY = y + dy;
         newW = w - dx;
         newH = h - dy;
         break;
       case 'top':
+        // Top: only change height, move position
         newY = y + dy;
         newH = h - dy;
         break;
       case 'topRight':
+        // Corner: change both width and height, move position
         newY = y + dy;
         newW = w + dx;
         newH = h - dy;
         break;
       case 'right':
+        // Right: only change width
         newW = w + dx;
         break;
       case 'bottomRight':
+        // Corner: change both width and height
         newW = w + dx;
         newH = h + dy;
         break;
       case 'bottom':
+        // Bottom: only change height
         newH = h + dy;
         break;
       case 'bottomLeft':
+        // Corner: change both width and height, move position
         newX = x + dx;
         newW = w - dx;
         newH = h + dy;
         break;
       case 'left':
+        // Left: only change width, move position
         newX = x + dx;
         newW = w - dx;
         break;
     }
     
-    // Constrain
-    newW = Math.max(MIN_SHAPE_SIZE, Math.min(newW, canvasLayout.width - newX));
-    newH = Math.max(MIN_SHAPE_SIZE, Math.min(newH, canvasLayout.height - newY));
+    // Constrain to minimum size and canvas bounds
+    const minSize = MIN_SHAPE_SIZE;
+    newW = Math.max(minSize, Math.min(newW, canvasLayout.width - newX));
+    newH = Math.max(minSize, Math.min(newH, canvasLayout.height - newY));
     newX = Math.max(0, Math.min(newX, canvasLayout.width - newW));
     newY = Math.max(0, Math.min(newY, canvasLayout.height - newH));
     
-    // Update size based on shape type
     if (shape.type === 'circle') {
-      // For circles, keep it square
-      const newSize = Math.max(newW, newH);
-      updateSize(shape.id, newSize, newX, newY);
+      // For circles, keep it square but allow resizing from any direction
+      const delta = Math.max(newW, newH);
+      if (['topLeft', 'left', 'top'].includes(handle)) {
+        // Move position when resizing from left/top
+        newX = x + (w - delta);
+        newY = y + (h - delta);
+      }
+      updateSize(shape.id, delta, delta, newX, newY);
+    } else if (shape.type === 'rectangle') {
+      // For rectangles, allow independent width/height
+      updateSize(shape.id, newW, newH, newX, newY);
     } else if (shape.type === 'line') {
-      // For lines, use width as size
-      updateSize(shape.id, newW, newX, newY);
+      // For lines, only change width (length)
+      updateSize(shape.id, newW, 20, newX, newY);
     } else {
-      // For rectangles, triangles, and icon shapes, use width as size
-      updateSize(shape.id, newW, newX, newY);
+      // For other shapes (triangle, star, etc.), treat like rectangles
+      updateSize(shape.id, newW, newH, newX, newY);
     }
   };
 
@@ -1560,12 +2283,12 @@ const ShapeOnCanvas = ({ shape, selected, onPress, draggable, updatePosition, ca
         style={[
           styles.shapeRect,
           {
-            width: shape.size,
-            height: shape.size * 0.7,
+            width: shape.width ?? shape.size,
+            height: shape.height ?? (shape.size * 0.7),
             backgroundColor: shape.color || 'transparent',
             position: 'absolute',
-            borderWidth: selected ? 2 : 2,
-            borderColor: selected ? '#7c3aed' : '#bbb',
+            borderWidth: selected ? 3 : 0,
+            borderColor: selected ? '#7c3aed' : 'transparent',
             zIndex: selected ? 2 : 1,
             transform: pan.getTranslateTransform(),
           },
@@ -1596,8 +2319,8 @@ const ShapeOnCanvas = ({ shape, selected, onPress, draggable, updatePosition, ca
             backgroundColor: shape.color || 'transparent',
             borderRadius: shape.size / 2,
             position: 'absolute',
-            borderWidth: selected ? 2 : 2,
-            borderColor: selected ? '#7c3aed' : '#bbb',
+            borderWidth: selected ? 3 : 0,
+            borderColor: selected ? '#7c3aed' : 'transparent',
             zIndex: selected ? 2 : 1,
             transform: pan.getTranslateTransform(),
           },
@@ -2001,31 +2724,29 @@ const styles = StyleSheet.create({
   colorPickerPopup: {
     position: 'absolute',
     top: 60,
-    left: '50%',
-    transform: [{ translateX: -80 }],
+    left: 20,
+    right: 20,
     backgroundColor: '#fff',
     borderRadius: 16,
-    padding: 10,
-    flexDirection: 'row',
+    padding: 16,
     elevation: 8,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.12,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
     shadowRadius: 8,
-    zIndex: 30,
+    zIndex: 1000,
   },
   colorPickerScroll: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
   },
   colorSwatch: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    marginHorizontal: 6,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    marginHorizontal: 4,
     borderWidth: 2,
-    borderColor: '#eee',
+    borderColor: '#ddd',
   },
   selectedSwatch: {
     borderColor: '#3478f6',
@@ -2136,5 +2857,142 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     zIndex: 20,
     flexDirection: 'row',
+  },
+  colorPickerOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  colorPickerContainer: {
+    backgroundColor: '#fff',
+    borderRadius: 20,
+    padding: 24,
+    width: '85%',
+    maxWidth: 400,
+    elevation: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 12,
+  },
+  colorPickerHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  colorPickerTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  closeButton: {
+    padding: 4,
+  },
+  colorPreviewContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 24,
+    paddingVertical: 16,
+    backgroundColor: '#f8f9fa',
+    borderRadius: 12,
+  },
+  colorPreview: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    marginRight: 12,
+    borderWidth: 2,
+    borderColor: '#ddd',
+  },
+  colorHex: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#333',
+  },
+  sliderContainer: {
+    marginBottom: 20,
+  },
+  sliderLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: 8,
+  },
+  hueSliderContainer: {
+    position: 'relative',
+    height: 40,
+    justifyContent: 'center',
+  },
+  hueSlider: {
+    position: 'absolute',
+    top: 18,
+    left: 0,
+    right: 0,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: 'transparent',
+  },
+  slider: {
+    width: '100%',
+    height: 40,
+  },
+  sliderThumb: {
+    backgroundColor: '#fff',
+    borderWidth: 2,
+    borderColor: '#3478f6',
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+  },
+  colorPickerActions: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 8,
+  },
+  cancelButton: {
+    flex: 1,
+    backgroundColor: '#f1f3f4',
+    paddingVertical: 12,
+    borderRadius: 12,
+    marginRight: 8,
+    alignItems: 'center',
+  },
+  cancelButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#666',
+  },
+  applyButton: {
+    flex: 1,
+    backgroundColor: '#3478f6',
+    paddingVertical: 12,
+    borderRadius: 12,
+    marginLeft: 8,
+    alignItems: 'center',
+  },
+  applyButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#fff',
+  },
+  colorPickerButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#f8f9fa',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: '#3478f6',
+  },
+  colorPickerButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#3478f6',
+    marginLeft: 8,
   },
 });

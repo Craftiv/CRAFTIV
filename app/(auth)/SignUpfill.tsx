@@ -17,8 +17,8 @@ import {
   View,
 } from 'react-native';
 // Remove import { apiFetch } from '../constants/apiClient';
-import { useAuth } from '../../contexts/AuthContext';
 import { format } from 'date-fns';
+import { useAuth } from '../../contexts/AuthContext';
 
 export default function EmailAuth() {
   const router = useRouter();
@@ -66,11 +66,11 @@ export default function EmailAuth() {
     try {
       // Try different URLs based on platform and environment
       let backendUrl;
-      backendUrl = 'http://10.132.53.119:8081/api/auth/register';
+      backendUrl = 'http://Localhost:8081/api/auth/register';
       console.log('Platform:', Platform.OS);
       console.log('Backend URL:', backendUrl);
       console.log('Attempting to connect to backend...');
-      const response = await fetch('http://10.132.53.119:8081/api/auth/register', {
+      const response = await fetch('http://Localhost:8081/api/auth/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
